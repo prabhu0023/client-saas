@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { generateSlots } from '@/lib/availability/slot-generation'
-import { localToUtc, localDayLabel } from '@/lib/availability/timezone'
-import type { DoctorOption, DayOption } from './types'
+import { localToUtc, localDayLabel, localTimeLabel } from '@/lib/availability/timezone'
+import type { DoctorOption, DayOption, CancelOption } from './types'
 
 /**
  * DB reads that back the WhatsApp flow. Kept separate from the flow
@@ -131,4 +131,105 @@ function ymdInTz(base: Date, timeZone: string, offsetDays: number): string {
     day: '2-digit',
   })
   return fmt.format(d)
+}
+
+/**
+ * A patient's upcoming, still-cancellable appointments at this clinic,
+ * keyed by (clinic_id, wa_phone). "Cancellable" = starts in the future
+ * and is in an active status (booked/confirmed). Ordered soonest-first
+ * and capped at 10 (a numbered menu fits ≤10). Labels are rendered in
+ * the clinic timezone.
+ */
+export async function loadUpcomingAppointments(
+  clinicId: string,
+  waPhone: string,
+  clinicTimezone: string,
+  now: Date = new Date(),
+): Promise<CancelOption[]> {
+  const db = supabaseAdmin()
+
+  // Resolve the patient record for this clinic + phone. No record → the
+  // patient has never booked here, so nothing to cancel.
+  const { data: patient, error: pErr } = await db
+    .from('patients')
+    .select('id')
+    .eq('clinic_id', clinicId)
+    .eq('wa_phone', waPhone)
+    .maybeSingle()
+  if (pErr || !patient) {
+    if (pErr) console.error('[wa/query] loadUpcomingAppointments patient:', pErr.message)
+    return []
+  }
+
+  const { data, error } = await db
+    .from('appointments')
+    .select('id, starts_at, doctor_profiles ( specialty )')
+    .eq('clinic_id', clinicId)
+    .eq('patient_id', (patient as { id: string }).id)
+    .in('status', ['booked', 'confirmed'])
+    .gte('starts_at', now.toISOString())
+    .order('starts_at', { ascending: true })
+    .limit(10)
+
+  if (error) {
+    console.error('[wa/query] loadUpcomingAppointments failed:', error.message)
+    return []
+  }
+
+  type Row = {
+    id: string
+    starts_at: string
+    doctor_profiles: { specialty: string | null } | null
+  }
+
+  return ((data ?? []) as unknown as Row[]).map((r) => {
+    const starts = new Date(r.starts_at)
+    const day = localDayLabel(starts, clinicTimezone)
+    const time = localTimeLabel(starts, clinicTimezone)
+    const specialty = r.doctor_profiles?.specialty
+    const label = specialty
+      ? `${day} at ${time} (${specialty})`
+      : `${day} at ${time}`
+    return { id: r.id, label }
+  })
+}
+
+/**
+ * Cancel an appointment by id, scoped to (clinic_id, wa_phone) so a
+ * patient can only cancel their OWN appointment. Only active statuses
+ * are cancellable. Returns true if a row was cancelled.
+ *
+ * Uses the service role (WhatsApp path) — the clinic+patient scoping is
+ * the tenancy guard, mirroring how booking re-checks tenancy in code.
+ */
+export async function cancelAppointment(
+  clinicId: string,
+  waPhone: string,
+  appointmentId: string,
+): Promise<boolean> {
+  const db = supabaseAdmin()
+
+  const { data: patient } = await db
+    .from('patients')
+    .select('id')
+    .eq('clinic_id', clinicId)
+    .eq('wa_phone', waPhone)
+    .maybeSingle()
+  if (!patient) return false
+
+  const { data, error } = await db
+    .from('appointments')
+    .update({ status: 'cancelled' })
+    .eq('id', appointmentId)
+    .eq('clinic_id', clinicId)
+    .eq('patient_id', (patient as { id: string }).id)
+    .in('status', ['booked', 'confirmed'])
+    .select('id')
+    .maybeSingle()
+
+  if (error) {
+    console.error('[wa/query] cancelAppointment failed:', error.message)
+    return false
+  }
+  return Boolean(data)
 }

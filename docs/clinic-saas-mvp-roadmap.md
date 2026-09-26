@@ -206,7 +206,7 @@ message reuses.
 **Goal:** patients can cancel/reschedule without calling the clinic, and staff
 changes reach the patient. Completes the "real appointment" story.
 
-### E4-T1 — Patient cancel over WhatsApp
+### E4-T1 — Patient cancel over WhatsApp ✅ DONE
 - **Scope:** extend the flow so a keyword (e.g. "cancel") lists the patient's
   upcoming appointments (by `clinic_id` + `wa_phone`) and cancels the chosen one
   (status → `cancelled`), freeing the slot. New session step(s) reusing

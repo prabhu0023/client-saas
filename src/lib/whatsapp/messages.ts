@@ -74,6 +74,32 @@ export function buildTimeMenu(to: string, labels: string[]): OutboundText {
   return numberedMenu(to, 'Please pick a time:', labels)
 }
 
+export function buildCancelMenu(to: string, labels: string[]): OutboundText {
+  return numberedMenu(
+    to,
+    'Which appointment would you like to cancel?',
+    labels,
+  )
+}
+
+/** Shown when the patient has no upcoming appointments to cancel. */
+export function buildNoAppointments(to: string): OutboundText {
+  return {
+    kind: 'text',
+    to,
+    body: 'You have no upcoming appointments to cancel.',
+  }
+}
+
+/** Confirmation after a successful cancellation. */
+export function buildCancelled(to: string, apptLabel: string): OutboundText {
+  return {
+    kind: 'text',
+    to,
+    body: `Your appointment on ${apptLabel} has been cancelled. To book a new one, reply with "appointment".`,
+  }
+}
+
 /** Shown when a typed reply doesn't match any offered option. */
 export function buildDidNotUnderstand(to: string): OutboundText {
   return {

@@ -13,6 +13,7 @@ export type FlowStep =
   | 'awaiting_doctor'
   | 'awaiting_day'
   | 'awaiting_time'
+  | 'awaiting_cancel'
 
 /** One numbered option we presented, so a typed reply can be matched. */
 export interface FlowOption {

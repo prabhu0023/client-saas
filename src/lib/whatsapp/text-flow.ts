@@ -7,6 +7,8 @@ import {
   loadDoctorLabel,
   loadDoctorSlotMinutes,
   loadAvailableDays,
+  loadUpcomingAppointments,
+  cancelAppointment,
 } from './query'
 import {
   buildDoctorMenu,
@@ -16,8 +18,11 @@ import {
   buildNoAvailability,
   buildFallback,
   buildDidNotUnderstand,
+  buildCancelMenu,
+  buildNoAppointments,
+  buildCancelled,
 } from './messages'
-import { matchesBookingKeyword } from './keywords'
+import { matchesBookingKeyword, matchesCancelKeyword } from './keywords'
 import {
   loadSession,
   saveSession,
@@ -75,9 +80,12 @@ export async function handleTextMessage(
   const to = input.waPhone
   const existing = await loadSession(input.conversationId)
 
-  // No live session: only a booking keyword starts a flow; anything
-  // else gets the fallback nudge.
+  // No live session: a cancel keyword starts the cancel flow, a booking
+  // keyword starts booking; anything else gets the fallback nudge.
+  // Cancel is checked first because "cancel my appointment" also contains
+  // a booking keyword ("appointment").
   if (!existing || existing.step === 'idle') {
+    if (matchesCancelKeyword(input.text)) return startCancelStep(clinic, input, to)
     if (!matchesBookingKeyword(input.text)) return buildFallback(to)
     return startDoctorStep(clinic, input, to)
   }
@@ -87,6 +95,8 @@ export async function handleTextMessage(
       return handleDoctorReply(clinic, existing, input, to)
     case 'awaiting_day':
       return handleDayReply(clinic, existing, input, to)
+    case 'awaiting_cancel':
+      return handleCancelReply(clinic, existing, input, to)
     case 'awaiting_time':
       return handleTimeReply(clinic, existing, input, to)
     default:
@@ -265,6 +275,56 @@ async function handleTimeReply(
   // invalid / error: reset so the patient can start over.
   await clearSession(input.conversationId)
   return buildFallback(to)
+}
+
+// ------------------------------------------------------------
+// Cancel flow: list the patient's upcoming appointments, cancel the
+// chosen one. Entered by a 'cancel' keyword from an idle conversation.
+// ------------------------------------------------------------
+async function startCancelStep(
+  clinic: ClinicRow,
+  input: TextFlowInput,
+  to: string,
+): Promise<OutboundMessage> {
+  const appts = await loadUpcomingAppointments(
+    clinic.id,
+    input.waPhone,
+    clinic.timezone,
+  )
+  if (appts.length === 0) return buildNoAppointments(to)
+
+  const options: FlowOption[] = appts.map((a, i) => ({
+    n: i + 1,
+    id: a.id,
+    label: a.label,
+  }))
+  await saveSession({
+    conversationId: input.conversationId,
+    clinicId: clinic.id,
+    waPhone: input.waPhone,
+    step: 'awaiting_cancel',
+    data: { options },
+  })
+  return buildCancelMenu(to, options.map((o) => o.label))
+}
+
+async function handleCancelReply(
+  clinic: ClinicRow,
+  session: WaSession,
+  input: TextFlowInput,
+  to: string,
+): Promise<OutboundMessage> {
+  const options = session.data.options ?? []
+  const picked = matchOption(input.text, options)
+  if (!picked) return buildDidNotUnderstand(to)
+
+  const ok = await cancelAppointment(clinic.id, input.waPhone, picked.id)
+  await clearSession(input.conversationId)
+
+  // On success confirm with the label we showed; if the row was already
+  // gone/changed (e.g. staff cancelled it first), fall back gracefully.
+  if (ok) return buildCancelled(to, picked.label)
+  return buildNoAppointments(to)
 }
 
 async function loadClinic(clinicId: string): Promise<ClinicRow | null> {

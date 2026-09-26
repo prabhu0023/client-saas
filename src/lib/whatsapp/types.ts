@@ -77,3 +77,11 @@ export interface DayOption {
   dateYmd: string
   label: string
 }
+
+/** An upcoming appointment the patient can cancel, as a pickable option. */
+export interface CancelOption {
+  /** Appointment id. */
+  id: string
+  /** Human label, e.g. 'Mon, Sep 28 at 9:00 AM (General)'. */
+  label: string
+}

@@ -50,12 +50,17 @@ const loadDoctorOptionsMock = vi.fn()
 const loadDoctorLabelMock = vi.fn()
 const loadDoctorSlotMinutesMock = vi.fn()
 const loadAvailableDaysMock = vi.fn()
+const loadUpcomingAppointmentsMock = vi.fn()
+const cancelAppointmentMock = vi.fn()
 
 vi.mock('./query', () => ({
   loadDoctorOptions: (...a: unknown[]) => loadDoctorOptionsMock(...a),
   loadDoctorLabel: (...a: unknown[]) => loadDoctorLabelMock(...a),
   loadDoctorSlotMinutes: (...a: unknown[]) => loadDoctorSlotMinutesMock(...a),
   loadAvailableDays: (...a: unknown[]) => loadAvailableDaysMock(...a),
+  loadUpcomingAppointments: (...a: unknown[]) =>
+    loadUpcomingAppointmentsMock(...a),
+  cancelAppointment: (...a: unknown[]) => cancelAppointmentMock(...a),
 }))
 
 // ------------------------------------------------------------
@@ -145,6 +150,11 @@ beforeEach(() => {
     appointmentId: 'appt-1',
     patientId: 'pat-1',
   })
+  loadUpcomingAppointmentsMock.mockResolvedValue([
+    { id: 'appt-A', label: 'Mon, Sep 28 at 9:00 AM (General)' },
+    { id: 'appt-B', label: 'Tue, Sep 29 at 10:00 AM (Pediatrics)' },
+  ])
+  cancelAppointmentMock.mockResolvedValue(true)
 })
 
 describe('handleTextMessage — full booking flow', () => {
@@ -242,5 +252,59 @@ describe('handleTextMessage — non-happy paths', () => {
     await send('appointment') // doctor menu
     const r2 = await send('1') // pick doctor → tries days
     expect(r2?.body).toContain('no open slots')
+  })
+})
+
+describe('handleTextMessage — cancel flow', () => {
+  it('cancel keyword lists upcoming appointments', async () => {
+    const r = await send('cancel')
+    expect(r?.body).toContain('cancel')
+    expect(r?.body).toContain('1. Mon, Sep 28 at 9:00 AM (General)')
+    expect(sessions.get(CONV)?.step).toBe('awaiting_cancel')
+  })
+
+  it('"cancel my appointment" starts cancel, not a new booking', async () => {
+    const r = await send('cancel my appointment')
+    // Cancel menu, not the doctor menu.
+    expect(r?.body).toContain('cancel')
+    expect(sessions.get(CONV)?.step).toBe('awaiting_cancel')
+    expect(loadDoctorOptionsMock).not.toHaveBeenCalled()
+  })
+
+  it('picking an appointment cancels it and confirms', async () => {
+    await send('cancel') // → awaiting_cancel
+    const r = await send('1') // pick the first
+
+    expect(cancelAppointmentMock).toHaveBeenCalledWith(
+      CLINIC.id,
+      PHONE,
+      'appt-A',
+    )
+    expect(r?.body).toContain('has been cancelled')
+    expect(r?.body).toContain('Mon, Sep 28 at 9:00 AM (General)')
+    expect(sessions.has(CONV)).toBe(false) // session cleared
+  })
+
+  it('no upcoming appointments → nothing-to-cancel message, no session', async () => {
+    loadUpcomingAppointmentsMock.mockResolvedValue([])
+    const r = await send('cancel')
+    expect(r?.body).toContain('no upcoming appointments')
+    expect(sessions.has(CONV)).toBe(false)
+  })
+
+  it('unrecognized pick at cancel step → did-not-understand, stays put', async () => {
+    await send('cancel')
+    const r = await send('the morning one')
+    expect(r?.body).toContain("didn't catch that")
+    expect(sessions.get(CONV)?.step).toBe('awaiting_cancel')
+    expect(cancelAppointmentMock).not.toHaveBeenCalled()
+  })
+
+  it('appointment already gone (cancel returns false) → graceful fallback', async () => {
+    cancelAppointmentMock.mockResolvedValue(false)
+    await send('cancel')
+    const r = await send('1')
+    expect(r?.body).toContain('no upcoming appointments')
+    expect(sessions.has(CONV)).toBe(false)
   })
 })
