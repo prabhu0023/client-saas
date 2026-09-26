@@ -1,4 +1,4 @@
-# Clinic SaaS
+# DoctorDesk
 
 WhatsApp-first clinic appointment platform. Staff portal coming soon.
 

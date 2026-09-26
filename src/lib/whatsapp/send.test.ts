@@ -43,7 +43,7 @@ describe('sendTemplate — configured', () => {
     const res = await sendTemplate({
       kind: 'template',
       to: '+919876543210',
-      templateName: 'appointment_reminder',
+      templateName: 'doctordesk_appointment_reminder',
       bodyParams: ['Dr. Rao', 'Mon, Sep 28', '9:00 AM'],
       languageCode: 'en',
     })
@@ -57,13 +57,15 @@ describe('sendTemplate — configured', () => {
     expect((init!.headers as Record<string, string>).authorization).toBe(
       `Bearer ${KEY}`,
     )
+    // wacrm's public API expects `params` (ordered positional body
+    // vars), not `body_params` — confirmed against docs/public-api.md.
     expect(JSON.parse(init!.body as string)).toEqual({
       to: '+919876543210',
       type: 'template',
       template: {
-        name: 'appointment_reminder',
+        name: 'doctordesk_appointment_reminder',
         language: 'en',
-        body_params: ['Dr. Rao', 'Mon, Sep 28', '9:00 AM'],
+        params: ['Dr. Rao', 'Mon, Sep 28', '9:00 AM'],
       },
     })
   })
@@ -75,7 +77,7 @@ describe('sendTemplate — configured', () => {
     await sendTemplate({
       kind: 'template',
       to: '+911112223334',
-      templateName: 'appointment_reminder',
+      templateName: 'doctordesk_appointment_reminder',
       bodyParams: [],
     })
 
@@ -93,7 +95,7 @@ describe('sendTemplate — configured', () => {
     const res = await sendTemplate({
       kind: 'template',
       to: '+919876543210',
-      templateName: 'appointment_reminder',
+      templateName: 'doctordesk_appointment_reminder',
       bodyParams: ['x'],
     })
     expect(res.ok).toBe(false)
@@ -112,7 +114,7 @@ describe('sendTemplate — configured', () => {
     const res = await sendTemplate({
       kind: 'template',
       to: '+919876543210',
-      templateName: 'appointment_reminder',
+      templateName: 'doctordesk_appointment_reminder',
       bodyParams: ['x'],
     })
     expect(res).toEqual({ ok: false, error: 'network down' })
@@ -128,7 +130,7 @@ describe('sendTemplate — unconfigured', () => {
     const res = await sendTemplate({
       kind: 'template',
       to: '+919876543210',
-      templateName: 'appointment_reminder',
+      templateName: 'doctordesk_appointment_reminder',
       bodyParams: ['x'],
     })
     expect(res).toEqual({ ok: false, error: 'wacrm channel not configured' })

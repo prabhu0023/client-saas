@@ -24,7 +24,7 @@ export default async function LoginPage({
   return (
     <div className={styles.wrap}>
       <div className={styles.card}>
-        <h1 className={styles.title}>Clinic SaaS</h1>
+        <h1 className={styles.title}>DoctorDesk</h1>
         <p className={styles.subtitle}>Sign in to the staff portal</p>
 
         {message && (

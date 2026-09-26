@@ -1,3 +1,7 @@
+> ⚠️ **ARCHIVED / superseded.** Repo structure now lives in
+> `../product-requirements.md` §10, and the migration list in §6. Kept for
+> history; not maintained. See `./README.md`.
+
 # Clinic Appointment SaaS — Proposed Code Folder Structure
 
 > Companion to `clinic-saas-plan.md` and `clinic-saas-architecture.md`. This is
@@ -96,20 +100,22 @@ src/lib/
 ├── booking/
 │   ├── book.ts                   # §5: atomic insert (via RPC) + conflict recovery
 │   ├── book.test.ts              # Race / exclusion-violation handling
-│   ├── slot-id.ts                # Encode/parse slot row ids
-│   └── slot-id.test.ts
+│   └── book.concurrency.test.ts  # Gated race test vs a real DB (skipped by default)
 │
 ├── whatsapp/
 │   ├── text-flow.ts              # LIVE: numbered-text state machine (doctor→day→time)
+│   ├── text-flow.test.ts         # Integration test driving the state machine
+│   ├── keywords.ts               # Booking/cancel/reschedule keyword matching
 │   ├── session.ts                # wa_sessions state + option matching
-│   ├── query.ts                  # DB reads backing the flow (doctors, days)
+│   ├── query.ts                  # DB reads backing the flow (doctors, days, upcoming)
 │   ├── messages.ts               # Numbered-menu + confirmation builders
-│   ├── send.ts                   # Send via wacrm
+│   ├── send.ts                   # Send via wacrm (text + template)
+│   ├── send.test.ts
+│   ├── notify.ts                 # Patient notify on staff-side change (template)
+│   ├── notify.test.ts
 │   ├── wacrm-client.ts           # wacrm public-API client (resolve contact phone)
-│   ├── verify-signature.ts       # Verify wacrm webhook HMAC
-│   ├── types.ts                  # Inbound/outbound message shapes
-│   ├── flow.ts                   # ORPHANED stateless router (see note)
-│   └── flow.test.ts
+│   ├── verify-signature.ts       # Verify wacrm webhook HMAC (named failure reasons)
+│   └── types.ts                  # Inbound/outbound message shapes
 │
 ├── portal/
 │   ├── auth.ts                   # Staff session + role helpers
@@ -118,10 +124,12 @@ src/lib/
 # future: reminders/ (scheduler + template send), patients/
 ```
 
-> **Reconciliation note:** the live WhatsApp flow is the numbered-text variant
-> (`text-flow.ts` + `session.ts`), driven by the inbound route. `flow.ts` (the
-> stateless tap-based router) and `resolve-by-number.ts` are **orphaned** — kept
-> for now but not wired. Consolidating them is a pending cleanup.
+> **Reconciliation note (resolved):** the live WhatsApp flow is the numbered-text
+> variant (`text-flow.ts` + `session.ts`), driven by the inbound route. The old
+> orphaned tap-based files (`flow.ts`, `resolve-by-number.ts`,
+> `src/lib/booking/slot-id.ts`) and their tests were **removed** (roadmap E1-T1);
+> `matchesBookingKeyword` moved to `keywords.ts`. This tree reflects the current,
+> cleaned code.
 
 ---
 
@@ -129,17 +137,24 @@ src/lib/
 
 ```
 supabase/migrations/
-├── 001_initial_schema.sql        # All tables from §3 of the plan
-├── 002_btree_gist_exclusion.sql  # btree_gist + no-overlap constraint
-├── 003_rls_policies.sql          # RLS + clinic_members isolation
-├── 004_book_appointment_fn.sql   # Transactional booking RPC
-├── 005_processed_wa_events.sql   # Inbound WhatsApp dedupe ledger
-└── (pending) wa_sessions, clinic_wacrm_accounts  # referenced by the live flow
+├── 001_initial_schema.sql          # All tables from §3 of the plan
+├── 002_btree_gist_exclusion.sql    # btree_gist + no-overlap constraint
+├── 003_rls_policies.sql            # RLS + clinic_members isolation
+├── 004_book_appointment_fn.sql     # Transactional booking RPC
+├── 005_processed_wa_events.sql     # Inbound WhatsApp dedupe ledger
+├── 006_wa_sessions.sql             # Conversation state for the numbered-text flow
+├── 006_wacrm_sessions.sql          # (dup 006) wacrm session/account bits
+├── 007_appointment_reminders.sql   # reminder_sent_at + due-scan index
+├── 007_clinic_wacrm_accounts.sql   # (dup 007) account_id → clinic routing
+├── 008_wa_session_cancel_step.sql  # Widen step CHECK: awaiting_cancel
+├── 009_wa_session_reschedule_step.sql # Widen step CHECK: awaiting_reschedule
+└── 010_clinic_doctor_names_fn.sql  # SECURITY DEFINER doctor-name lookup (E6-T1)
 ```
 
-> **Gap:** the live flow references `wa_sessions` (session state) and
-> `clinic_wacrm_accounts` (account→clinic routing) which do not yet have
-> migrations — this blocks runtime and is the top pending item.
+> **Resolved:** `wa_sessions` (session state) and `clinic_wacrm_accounts`
+> (account→clinic routing) migrations **exist** (006). The earlier "pending /
+> blocks runtime" note was stale. Note the duplicate 006/007 numbers already in
+> the tree — the next migration to add is **011**.
 
 ---
 

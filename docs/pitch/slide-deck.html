@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DoctorDesk - Pitch Deck</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0a; color: #fff; }
+    
+    .slide {
+      min-height: 100vh;
+      padding: 60px 80px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      border-bottom: 1px solid #222;
+      position: relative;
+    }
+    
+    .slide-number {
+      position: absolute;
+      bottom: 30px;
+      right: 40px;
+      font-size: 14px;
+      color: #666;
+    }
+    
+    /* Slide 1 - Title */
+    .slide-title {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      text-align: center;
+    }
+    .logo {
+      font-size: 72px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 20px;
+    }
+    .tagline {
+      font-size: 28px;
+      color: #aaa;
+      margin-bottom: 60px;
+    }
+    .subtitle {
+      font-size: 18px;
+      color: #666;
+    }
+    
+    /* Slide 2 - Problem */
+    .slide-problem { background: #111; }
+    .section-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      color: #25D366;
+      margin-bottom: 20px;
+    }
+    h2 {
+      font-size: 48px;
+      font-weight: 700;
+      margin-bottom: 50px;
+      line-height: 1.2;
+    }
+    .problem-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 30px;
+      max-width: 900px;
+    }
+    .problem-card {
+      background: #1a1a1a;
+      border-radius: 16px;
+      padding: 30px;
+      border-left: 4px solid #e74c3c;
+    }
+    .problem-card h3 {
+      font-size: 20px;
+      margin-bottom: 10px;
+      color: #e74c3c;
+    }
+    .problem-card p {
+      color: #888;
+      line-height: 1.6;
+    }
+    
+    /* Slide 3 - Solution Intro */
+    .slide-solution {
+      background: linear-gradient(135deg, #0d4d2f 0%, #0a2e1c 100%);
+      text-align: center;
+    }
+    .slide-solution h2 {
+      font-size: 56px;
+      margin-bottom: 30px;
+    }
+    .solution-highlight {
+      font-size: 24px;
+      color: #25D366;
+      max-width: 700px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+    
+    /* Slide 4 - WhatsApp Demo */
+    .slide-demo { background: #111; }
+    .demo-container {
+      display: flex;
+      gap: 60px;
+      align-items: center;
+    }
+    .phone-mockup {
+      width: 300px;
+      background: #1a1a1a;
+      border-radius: 40px;
+      padding: 20px;
+      border: 3px solid #333;
+      flex-shrink: 0;
+    }
+    .phone-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 15px;
+      background: #075E54;
+      border-radius: 20px 20px 0 0;
+      margin: -20px -20px 0 -20px;
+      padding: 20px;
+    }
+    .phone-avatar {
+      width: 40px;
+      height: 40px;
+      background: #25D366;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+    .phone-name {
+      font-weight: 600;
+    }
+    .phone-status {
+      font-size: 12px;
+      color: #aaa;
+    }
+    .chat-area {
+      padding: 20px 0;
+      min-height: 400px;
+    }
+    .message {
+      max-width: 85%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      margin-bottom: 10px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    .message-out {
+      background: #005C4B;
+      margin-left: auto;
+      border-bottom-right-radius: 4px;
+    }
+    .message-in {
+      background: #1f2c34;
+      border-bottom-left-radius: 4px;
+    }
+    .message-time {
+      font-size: 11px;
+      color: #888;
+      text-align: right;
+      margin-top: 4px;
+    }
+    .demo-steps {
+      flex: 1;
+    }
+    .demo-step {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 25px;
+      align-items: flex-start;
+    }
+    .step-number {
+      width: 36px;
+      height: 36px;
+      background: #25D366;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+    .step-content h4 {
+      font-size: 18px;
+      margin-bottom: 5px;
+    }
+    .step-content p {
+      color: #888;
+      font-size: 14px;
+    }
+    
+    /* Slide 5 - Portal */
+    .slide-portal { background: #0a0a0a; }
+    .portal-mockup {
+      background: #1a1a1a;
+      border-radius: 12px;
+      overflow: hidden;
+      max-width: 900px;
+      margin-top: 40px;
+      border: 1px solid #333;
+    }
+    .portal-header {
+      background: #222;
+      padding: 15px 25px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #333;
+    }
+    .portal-logo {
+      color: #25D366;
+      font-weight: 700;
+      font-size: 18px;
+    }
+    .portal-nav {
+      display: flex;
+      gap: 25px;
+    }
+    .portal-nav span {
+      color: #888;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .portal-nav span.active {
+      color: #25D366;
+    }
+    .portal-content {
+      padding: 25px;
+    }
+    .portal-title {
+      font-size: 24px;
+      margin-bottom: 5px;
+    }
+    .portal-subtitle {
+      color: #888;
+      font-size: 14px;
+      margin-bottom: 25px;
+    }
+    .appointment-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .appointment-card {
+      background: #252525;
+      border-radius: 10px;
+      padding: 18px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .appt-info {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+    .appt-time {
+      text-align: center;
+      min-width: 60px;
+    }
+    .appt-time .time {
+      font-size: 18px;
+      font-weight: 600;
+    }
+    .appt-time .date {
+      font-size: 12px;
+      color: #888;
+    }
+    .appt-divider {
+      width: 1px;
+      height: 40px;
+      background: #444;
+    }
+    .appt-patient h4 {
+      font-size: 16px;
+      margin-bottom: 3px;
+    }
+    .appt-patient p {
+      font-size: 13px;
+      color: #888;
+    }
+    .appt-status {
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .status-booked { background: #1a3a5c; color: #5dade2; }
+    .status-confirmed { background: #1a4d1a; color: #58d68d; }
+    .status-completed { background: #333; color: #aaa; }
+    
+    /* Slide 6 - Zero Double Booking */
+    .slide-guarantee {
+      background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%);
+      text-align: center;
+    }
+    .guarantee-icon {
+      font-size: 80px;
+      margin-bottom: 30px;
+    }
+    .guarantee-text {
+      font-size: 20px;
+      color: #888;
+      max-width: 600px;
+      margin: 30px auto 0;
+      line-height: 1.8;
+    }
+    .tech-badge {
+      display: inline-block;
+      background: #25D366;
+      color: #000;
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+      margin-top: 30px;
+    }
+    
+    /* Slide 7 - Features Grid */
+    .slide-features { background: #111; }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 25px;
+      margin-top: 40px;
+    }
+    .feature-card {
+      background: #1a1a1a;
+      border-radius: 16px;
+      padding: 30px;
+      border: 1px solid #333;
+    }
+    .feature-icon {
+      font-size: 36px;
+      margin-bottom: 15px;
+    }
+    .feature-card h3 {
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+    .feature-card p {
+      color: #888;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    
+    /* Slide 8 - Roadmap */
+    .slide-roadmap { background: #0a0a0a; }
+    .roadmap-timeline {
+      display: flex;
+      gap: 30px;
+      margin-top: 50px;
+      position: relative;
+    }
+    .roadmap-timeline::before {
+      content: '';
+      position: absolute;
+      top: 20px;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #25D366 0%, #25D366 25%, #444 25%, #444 100%);
+    }
+    .roadmap-item {
+      flex: 1;
+      position: relative;
+      padding-top: 50px;
+    }
+    .roadmap-dot {
+      position: absolute;
+      top: 10px;
+      left: 0;
+      width: 24px;
+      height: 24px;
+      background: #25D366;
+      border-radius: 50%;
+      border: 4px solid #0a0a0a;
+    }
+    .roadmap-dot.future {
+      background: #444;
+    }
+    .roadmap-label {
+      font-size: 12px;
+      color: #25D366;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+    .roadmap-label.future {
+      color: #888;
+    }
+    .roadmap-item h3 {
+      font-size: 18px;
+      margin-bottom: 15px;
+    }
+    .roadmap-item ul {
+      list-style: none;
+    }
+    .roadmap-item li {
+      color: #888;
+      font-size: 14px;
+      margin-bottom: 8px;
+      padding-left: 20px;
+      position: relative;
+    }
+    .roadmap-item li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: #25D366;
+    }
+    .roadmap-item.future li::before {
+      content: '○';
+      color: #666;
+    }
+    
+    /* Slide 9 - Future Vision (detailed) */
+    .slide-future { background: #0d0d0d; }
+    .future-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 25px;
+      margin-top: 35px;
+    }
+    .future-column {
+      background: #161616;
+      border-radius: 16px;
+      padding: 28px;
+      border-top: 4px solid #25D366;
+    }
+    .future-column.phase2 { border-top-color: #f39c12; }
+    .future-column.phase3 { border-top-color: #9b59b6; }
+    .future-column .phase-tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 12px;
+      margin-bottom: 15px;
+      background: rgba(37, 211, 102, 0.15);
+      color: #25D366;
+    }
+    .future-column.phase2 .phase-tag { background: rgba(243, 156, 18, 0.15); color: #f39c12; }
+    .future-column.phase3 .phase-tag { background: rgba(155, 89, 182, 0.15); color: #c39bd3; }
+    .future-column h3 {
+      font-size: 22px;
+      margin-bottom: 6px;
+    }
+    .future-column .phase-sub {
+      font-size: 13px;
+      color: #777;
+      margin-bottom: 20px;
+    }
+    .future-column ul {
+      list-style: none;
+    }
+    .future-column li {
+      font-size: 14px;
+      color: #bbb;
+      margin-bottom: 14px;
+      padding-left: 26px;
+      position: relative;
+      line-height: 1.4;
+    }
+    .future-column li::before {
+      content: '→';
+      position: absolute;
+      left: 0;
+      color: #25D366;
+      font-weight: bold;
+    }
+    .future-column.phase2 li::before { color: #f39c12; }
+    .future-column.phase3 li::before { color: #c39bd3; }
+    .future-column li strong {
+      color: #fff;
+      display: block;
+      font-size: 14px;
+      margin-bottom: 2px;
+    }
+    .future-column li span {
+      font-size: 12px;
+      color: #888;
+    }
+    .future-note {
+      margin-top: 30px;
+      font-size: 13px;
+      color: #666;
+      text-align: center;
+      font-style: italic;
+    }
+
+    /* Slide 10 - Stats */
+    .slide-stats {
+      background: linear-gradient(135deg, #0d4d2f 0%, #0a2e1c 100%);
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 40px;
+      margin-top: 50px;
+      text-align: center;
+    }
+    .stat-item .number {
+      font-size: 64px;
+      font-weight: 800;
+      color: #25D366;
+    }
+    .stat-item .label {
+      font-size: 18px;
+      color: #aaa;
+      margin-top: 10px;
+    }
+    
+    /* Slide 10 - CTA */
+    .slide-cta {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      text-align: center;
+    }
+    .cta-text {
+      font-size: 24px;
+      color: #aaa;
+      margin-bottom: 40px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.6;
+    }
+    .cta-button {
+      display: inline-block;
+      background: #25D366;
+      color: #000;
+      padding: 18px 50px;
+      border-radius: 50px;
+      font-size: 20px;
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .contact-info {
+      margin-top: 50px;
+      color: #666;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Slide 1: Title -->
+<div class="slide slide-title">
+  <div class="logo">DoctorDesk</div>
+  <div class="tagline">WhatsApp-First Clinic Appointments</div>
+  <div class="subtitle">Patients book in 60 seconds. Zero double-bookings. Ever.</div>
+  <div class="slide-number">1</div>
+</div>
+
+<!-- Slide 2: The Problem -->
+<div class="slide slide-problem">
+  <div class="section-label">The Problem</div>
+  <h2>Your clinic is losing patients<br/>before they even get in.</h2>
+  <div class="problem-grid">
+    <div class="problem-card">
+      <h3>📞 Missed Calls</h3>
+      <p>Patients call during busy hours, get no answer, and book with a competitor instead.</p>
+    </div>
+    <div class="problem-card">
+      <h3>📋 Manual Chaos</h3>
+      <p>Handwritten schedules, sticky notes, and the constant fear of double-bookings.</p>
+    </div>
+    <div class="problem-card">
+      <h3>🚫 No-Shows</h3>
+      <p>Phone reminders go unanswered. Empty slots that should have been filled.</p>
+    </div>
+    <div class="problem-card">
+      <h3>😓 Stressed Staff</h3>
+      <p>Receptionists answering the same questions, manually checking availability, all day.</p>
+    </div>
+  </div>
+  <div class="slide-number">2</div>
+</div>
+
+<!-- Slide 3: Solution Intro -->
+<div class="slide slide-solution">
+  <div class="section-label">The Solution</div>
+  <h2>Meet patients where they are.<br/>WhatsApp.</h2>
+  <p class="solution-highlight">500+ million Indians use WhatsApp every day. They message family, order food, pay bills. Now they can book doctor appointments — in under 60 seconds.</p>
+  <div class="slide-number">3</div>
+</div>
+
+<!-- Slide 4: WhatsApp Demo -->
+<div class="slide slide-demo">
+  <div class="section-label">How It Works</div>
+  <h2>Booking in 4 taps.</h2>
+  <div class="demo-container">
+    <div class="phone-mockup">
+      <div class="phone-header">
+        <div class="phone-avatar">SW</div>
+        <div>
+          <div class="phone-name">HealthFirst Clinic</div>
+          <div class="phone-status">online</div>
+        </div>
+      </div>
+      <div class="chat-area">
+        <div class="message message-out">
+          I need an appointment
+          <div class="message-time">10:23 AM ✓✓</div>
+        </div>
+        <div class="message message-in">
+          Welcome! Please select a doctor:<br><br>
+          1. Dr. Sharma (General)<br>
+          2. Dr. Patel (Cardiology)<br>
+          3. Dr. Gupta (Pediatrics)<br><br>
+          Reply with the number.
+          <div class="message-time">10:23 AM</div>
+        </div>
+        <div class="message message-out">
+          1
+          <div class="message-time">10:23 AM ✓✓</div>
+        </div>
+        <div class="message message-in">
+          Dr. Sharma — Available days:<br><br>
+          1. Thu, Oct 3 (4 slots)<br>
+          2. Fri, Oct 4 (7 slots)<br>
+          3. Mon, Oct 7 (5 slots)<br><br>
+          Reply with the number.
+          <div class="message-time">10:23 AM</div>
+        </div>
+        <div class="message message-out">
+          2
+          <div class="message-time">10:24 AM ✓✓</div>
+        </div>
+        <div class="message message-in">
+          Fri, Oct 4 — Available times:<br><br>
+          1. 09:00 AM<br>
+          2. 09:30 AM<br>
+          3. 10:30 AM<br>
+          4. 11:00 AM<br><br>
+          Reply with the number.
+          <div class="message-time">10:24 AM</div>
+        </div>
+        <div class="message message-out">
+          3
+          <div class="message-time">10:24 AM ✓✓</div>
+        </div>
+        <div class="message message-in">
+          ✅ <strong>Appointment Confirmed!</strong><br><br>
+          Dr. Sharma<br>
+          Friday, Oct 4, 2026<br>
+          10:30 AM<br><br>
+          We'll send you a reminder!
+          <div class="message-time">10:24 AM</div>
+        </div>
+      </div>
+    </div>
+    <div class="demo-steps">
+      <div class="demo-step">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <h4>Patient texts your WhatsApp</h4>
+          <p>"I need an appointment" — any time, day or night</p>
+        </div>
+      </div>
+      <div class="demo-step">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <h4>Picks a doctor</h4>
+          <p>Simple numbered list — no confusing menus</p>
+        </div>
+      </div>
+      <div class="demo-step">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <h4>Picks a day</h4>
+          <p>Only shows days with actual availability</p>
+        </div>
+      </div>
+      <div class="demo-step">
+        <div class="step-number">4</div>
+        <div class="step-content">
+          <h4>Picks a time</h4>
+          <p>Slot is reserved instantly — no waiting</p>
+        </div>
+      </div>
+      <div class="demo-step">
+        <div class="step-number">✓</div>
+        <div class="step-content">
+          <h4>Done. Confirmed.</h4>
+          <p>Total time: under 60 seconds</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-number">4</div>
+</div>
+
+<!-- Slide 5: Staff Portal -->
+<div class="slide slide-portal">
+  <div class="section-label">Staff Experience</div>
+  <h2>Your team sees everything.</h2>
+  <div class="portal-mockup">
+    <div class="portal-header">
+      <div class="portal-logo">DoctorDesk</div>
+      <div class="portal-nav">
+        <span class="active">Dashboard</span>
+        <span>Availability</span>
+        <span>Settings</span>
+      </div>
+    </div>
+    <div class="portal-content">
+      <div class="portal-title">Today's Appointments</div>
+      <div class="portal-subtitle">Friday, October 4, 2026 • Dr. Sharma • 8 appointments</div>
+      <div class="appointment-list">
+        <div class="appointment-card">
+          <div class="appt-info">
+            <div class="appt-time">
+              <div class="time">09:00</div>
+              <div class="date">AM</div>
+            </div>
+            <div class="appt-divider"></div>
+            <div class="appt-patient">
+              <h4>Priya Mehta</h4>
+              <p>+91 98765 43210 • General Checkup</p>
+            </div>
+          </div>
+          <div class="appt-status status-confirmed">Confirmed</div>
+        </div>
+        <div class="appointment-card">
+          <div class="appt-info">
+            <div class="appt-time">
+              <div class="time">09:30</div>
+              <div class="date">AM</div>
+            </div>
+            <div class="appt-divider"></div>
+            <div class="appt-patient">
+              <h4>Rahul Verma</h4>
+              <p>+91 87654 32109 • Follow-up</p>
+            </div>
+          </div>
+          <div class="appt-status status-booked">Booked</div>
+        </div>
+        <div class="appointment-card">
+          <div class="appt-info">
+            <div class="appt-time">
+              <div class="time">10:30</div>
+              <div class="date">AM</div>
+            </div>
+            <div class="appt-divider"></div>
+            <div class="appt-patient">
+              <h4>Anita Singh</h4>
+              <p>+91 76543 21098 • Consultation</p>
+            </div>
+          </div>
+          <div class="appt-status status-booked">Booked</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-number">5</div>
+</div>
+
+<!-- Slide 6: Zero Double Booking -->
+<div class="slide slide-guarantee">
+  <div class="guarantee-icon">🔒</div>
+  <h2>Zero double-bookings.<br/>Guaranteed.</h2>
+  <p class="guarantee-text">
+    If two patients try to book the exact same slot at the exact same moment, 
+    only one succeeds. The other is instantly offered the next available time.
+    <br><br>
+    This isn't a software promise — it's enforced at the database level. 
+    Mathematically impossible to break.
+  </p>
+  <div class="tech-badge">Database-Level Exclusion Constraint</div>
+  <div class="slide-number">6</div>
+</div>
+
+<!-- Slide 7: Features -->
+<div class="slide slide-features">
+  <div class="section-label">Features</div>
+  <h2>Everything you need. Nothing you don't.</h2>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">⏰</div>
+      <h3>Automatic Reminders</h3>
+      <p>WhatsApp reminders before appointments — far higher open rates than reminder calls (industry figures).</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔄</div>
+      <h3>Patient Self-Service</h3>
+      <p>Patients can cancel or reschedule over WhatsApp. No phone calls needed.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📅</div>
+      <h3>Availability Control</h3>
+      <p>Set weekly schedules, block dates, add extra hours. Updates instantly.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📱</div>
+      <h3>Instant Notifications</h3>
+      <p>Staff changes reach patients immediately via WhatsApp.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🌍</div>
+      <h3>Timezone Smart</h3>
+      <p>Handles DST and multiple timezones. Patients see times in their local clock.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔐</div>
+      <h3>Secure & Isolated</h3>
+      <p>Each clinic's data is isolated and encrypted. Building toward HIPAA/DPDP compliance.</p>
+    </div>
+  </div>
+  <div class="slide-number">7</div>
+</div>
+
+<!-- Slide 8: Roadmap -->
+<div class="slide slide-roadmap">
+  <div class="section-label">Vision</div>
+  <h2>Where we're going.</h2>
+  <div class="roadmap-timeline">
+    <div class="roadmap-item">
+      <div class="roadmap-dot"></div>
+      <div class="roadmap-label">Today</div>
+      <h3>Core Booking</h3>
+      <ul>
+        <li>WhatsApp booking flow</li>
+        <li>Staff portal</li>
+        <li>Reminders</li>
+        <li>Cancel/reschedule</li>
+        <li>Availability management</li>
+      </ul>
+    </div>
+    <div class="roadmap-item future">
+      <div class="roadmap-dot future"></div>
+      <div class="roadmap-label future">Q1 2027</div>
+      <h3>Growth</h3>
+      <ul>
+        <li>Self-serve onboarding</li>
+        <li>Multi-clinic support</li>
+        <li>Service-based booking</li>
+        <li>Staff invite system</li>
+      </ul>
+    </div>
+    <div class="roadmap-item future">
+      <div class="roadmap-dot future"></div>
+      <div class="roadmap-label future">Q2 2027</div>
+      <h3>Clinical</h3>
+      <ul>
+        <li>Follow-up reminders</li>
+        <li>Medication adherence</li>
+        <li>Lab test reminders</li>
+        <li>Patient history</li>
+      </ul>
+    </div>
+    <div class="roadmap-item future">
+      <div class="roadmap-dot future"></div>
+      <div class="roadmap-label future">Future</div>
+      <h3>Revenue</h3>
+      <ul>
+        <li>Payment collection</li>
+        <li>Digital invoices</li>
+        <li>E-prescriptions</li>
+        <li>Insurance integration</li>
+      </ul>
+    </div>
+  </div>
+  <div class="slide-number">8</div>
+</div>
+
+<!-- Slide 9: Future Vision (detailed) -->
+<div class="slide slide-future">
+  <div class="section-label">The Full Vision</div>
+  <h2>From booking tool to complete clinic platform.</h2>
+  <div class="future-grid">
+    <div class="future-column">
+      <span class="phase-tag">Phase 1 — Grow</span>
+      <h3>Scale to every clinic</h3>
+      <div class="phase-sub">Let any clinic self-onboard and run without us.</div>
+      <ul>
+        <li>
+          <strong>Self-serve onboarding</strong>
+          <span>Clinics sign up, connect WhatsApp, and go live without any manual setup.</span>
+        </li>
+        <li>
+          <strong>Multi-clinic & chains</strong>
+          <span>One dashboard across locations, with full data isolation per clinic.</span>
+        </li>
+        <li>
+          <strong>Staff invites & roles</strong>
+          <span>Admins add doctors, nurses, receptionists and set permissions in-portal.</span>
+        </li>
+        <li>
+          <strong>Service-based booking</strong>
+          <span>Patients book by need ("blood pressure check") — matched to the right doctor.</span>
+        </li>
+      </ul>
+    </div>
+    <div class="future-column phase2">
+      <span class="phase-tag">Phase 2 — Care</span>
+      <h3>Beyond the appointment</h3>
+      <div class="phase-sub">Keep patients healthy between visits.</div>
+      <ul>
+        <li>
+          <strong>Medication adherence</strong>
+          <span>Gentle WhatsApp nudges — "Have you taken your medicine today?"</span>
+        </li>
+        <li>
+          <strong>Lab test follow-ups</strong>
+          <span>Reminders to take tests and alerts when results are ready to collect.</span>
+        </li>
+        <li>
+          <strong>Next-visit reminders</strong>
+          <span>Proactive nudges for recurring check-ups and chronic care.</span>
+        </li>
+        <li>
+          <strong>Patient history & records</strong>
+          <span>A richer patient view with visit history and nurse workflows.</span>
+        </li>
+      </ul>
+    </div>
+    <div class="future-column phase3">
+      <span class="phase-tag">Phase 3 — Earn</span>
+      <h3>A full business platform</h3>
+      <div class="phase-sub">Revenue and clinical workflows, done right.</div>
+      <ul>
+        <li>
+          <strong>Payments over WhatsApp</strong>
+          <span>Collect consultation fees via Razorpay / Stripe — never touch card data.</span>
+        </li>
+        <li>
+          <strong>Invoices & receipts</strong>
+          <span>Automatic digital receipts sent straight to the patient's WhatsApp.</span>
+        </li>
+        <li>
+          <strong>E-prescriptions</strong>
+          <span>Compliant digital prescriptions where law permits, with doctor sign-off.</span>
+        </li>
+        <li>
+          <strong>Waitlist & smart fill</strong>
+          <span>Auto-offer freed slots to waiting patients when a cancellation happens.</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+  <div class="future-note">Each phase builds on the last. Clinical and payment features ship only where compliant — patient privacy and local regulations come first.</div>
+  <div class="slide-number">9</div>
+</div>
+
+<!-- Slide 10: Stats -->
+<div class="slide slide-stats">
+  <div class="section-label">Why WhatsApp</div>
+  <h2>The numbers speak.</h2>
+  <div class="stats-grid">
+    <div class="stat-item">
+      <div class="number">500M+</div>
+      <div class="label">Indians on WhatsApp (industry)</div>
+    </div>
+    <div class="stat-item">
+      <div class="number">~98%</div>
+      <div class="label">WhatsApp open rate (industry)</div>
+    </div>
+    <div class="stat-item">
+      <div class="number">&lt;60s</div>
+      <div class="label">To book an appointment</div>
+    </div>
+  </div>
+  <div class="slide-number">10</div>
+</div>
+
+<!-- Slide 11: CTA -->
+<div class="slide slide-cta">
+  <div class="logo">DoctorDesk</div>
+  <p class="cta-text">
+    Ready to give your patients the booking experience they deserve?
+    <br><br>
+    Let's set up a pilot for your clinic. Zero risk — just your feedback.
+  </p>
+  <a href="#" class="cta-button">Schedule a Demo</a>
+  <div class="contact-info">
+    Questions? Let's talk.
+  </div>
+  <div class="slide-number">11</div>
+</div>
+
+</body>
+</html>

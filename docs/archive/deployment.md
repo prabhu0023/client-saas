@@ -1,3 +1,7 @@
+> ⚠️ **ARCHIVED / merged.** Folded into `../full-setup-guide.md` (Appendices
+> C/D/E hold its unique content: from-zero DB bring-up, wacrm API contract,
+> hosting alternatives). Kept for history; not maintained. See `./README.md`.
+
 # Deployment Guide — wacrm + clinic-saas (free tier)
 
 > Goal: both apps live on public HTTPS, wired together, so a patient can have a
@@ -261,16 +265,48 @@ reminder window and sends the approved WhatsApp template for each.
 
 ---
 
-## Blockers to clear first (known gaps)
+## Blockers to clear first (status)
 
-1. **wacrm public API contract** — clinic-saas's `send.ts` assumes an endpoint
-   shape that should be verified against wacrm's real public API before relying
-   on it in production.
+1. ~~**wacrm public API contract** — verify `send.ts`.~~ **RESOLVED** — verified
+   against `wacrm/docs/public-api.md` and corrected `send.ts`:
+   - template body vars: `body_params` → **`params`** (the field wacrm accepts);
+   - dropped the unsupported `interactive_payload` list send — wacrm's public API
+     has no interactive/list type, so an `OutboundList` now degrades to a text
+     send (the live flow only sends numbered text menus anyway).
+   See "wacrm public API contract (verified)" below for the full confirmed shapes.
 2. **Meta onboarding lead time** — number + template approval can take days.
+   Still external; start early. Reminders need an **approved** template before
+   they deliver (booking demo is unaffected).
 
-> Resolved: an earlier version of this guide listed "missing migrations
-> (`wa_sessions` + `clinic_wacrm_accounts`)" as the top blocker. Both exist in
-> migration `006` — the schema is complete for the MVP.
+> Resolved earlier: "missing migrations (`wa_sessions` + `clinic_wacrm_accounts`)"
+> — both exist now (`006`, `007`). Schema is complete for the MVP.
+
+---
+
+## wacrm public API contract (verified against wacrm/docs/public-api.md)
+
+All calls: `Authorization: Bearer <WACRM_API_KEY>`, JSON, base `WACRM_BASE_URL`.
+Envelope: success `{ "data": ... }`, error `{ "error": { "code", "message" } }`.
+
+- **`GET /api/v1/me`** (no scope) → `data.account.id` = the **routing key**
+  (`DEMO_WACRM_ACCOUNT_ID` / `clinic_wacrm_accounts.wacrm_account_id`);
+  `data.key.scopes` lists the key's scopes.
+- **`POST /api/v1/messages`** (`messages:send`) — types `text` | `template` |
+  media only; **no interactive/list type**.
+  - text: `{ to, type:'text', text }`
+  - template: `{ to, type:'template', template:{ name, language, params:[...] } }`
+    — positional body vars are **`params`**.
+- **`GET /api/v1/contacts/{id}`** (`contacts:read`) → contact incl. `phone`
+  (E.164) — resolves the patient number from a webhook `contact_id`.
+- **Webhook `message.received`**:
+  `{ id, event, occurred_at, account_id, data:{ conversation_id, contact_id, whatsapp_message_id, content_type, text } }`.
+- **Signature** `X-Wacrm-Signature: t=<unix>,v1=<hex>`,
+  `v1 = HMAC_SHA256(secret, "${t}.${rawBody}")` over the raw body, constant-time,
+  reject stale `t`.
+
+Scopes: `messages:send` + `contacts:read` (booking) and `webhooks:manage` (only
+to register the forwarder). Rate limit 120 req/min per key. Webhook targets must
+be public `https://` (SSRF guard blocks localhost/private ranges).
 
 ---
 

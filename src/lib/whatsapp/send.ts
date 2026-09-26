@@ -6,15 +6,19 @@ import type { OutboundMessage, OutboundTemplate } from './types'
  * here means a later switch (e.g. Meta Cloud API direct) only touches
  * this file.
  *
- * Contract confirmed against the wacrm codebase:
- *   - text: { to, type: 'text', text }
- *   - list: { to, interactive_payload: { kind:'list', body,
- *            button_label, sections:[{ rows:[{id,title,description?}] }] } }
+ * Contract confirmed against wacrm's docs/public-api.md:
+ *   POST /api/v1/messages
+ *   - text:     { to, type: 'text', text }
+ *   - template: { to, type: 'template', template: { name, language, params } }
+ *   wacrm's public API supports type = text | template | media only.
+ *   There is NO interactive/list send type.
  *
  * NOTE: wacrm's inbound webhook does NOT forward the tapped list-row id,
- * so the booking flow is driven by numbered TEXT replies; interactive
- * lists are a nicer-to-read extra, not something we can round-trip. The
- * flow therefore sends text menus by default.
+ * so the booking flow is driven by numbered TEXT replies. Interactive
+ * lists cannot round-trip AND wacrm can't send them via the public API,
+ * so an OutboundList degrades to a plain text send of its body. The live
+ * flow only ever produces text menus, so this is a safety fallback for
+ * any orphaned caller.
  *
  * Replies sent right after a patient's message are inside the 24h
  * session window, so free-form text is allowed. Proactive messages
@@ -34,22 +38,12 @@ export async function sendMessage(msg: OutboundMessage): Promise<SendResult> {
     return { ok: false, error: 'wacrm channel not configured' }
   }
 
-  // Map our normalized shape to wacrm's public-API send contract
-  // (POST /api/v1/messages). Text is a plain `type:'text'` send; a list
-  // maps to wacrm's `interactive_payload` (kind:'list') — NOT the
-  // `type:'interactive_list'` shape an earlier draft assumed.
-  const payload =
-    msg.kind === 'text'
-      ? { to: msg.to, type: 'text', text: msg.body }
-      : {
-          to: msg.to,
-          interactive_payload: {
-            kind: 'list' as const,
-            body: msg.body,
-            button_label: msg.buttonLabel,
-            sections: [{ rows: msg.rows }],
-          },
-        }
+  // wacrm's public API (POST /api/v1/messages) supports type text |
+  // template | media only — no interactive/list. Text sends as-is; a
+  // list degrades to a text send of its body (the live flow never sends
+  // lists — it uses numbered text menus — so this is just a safe
+  // fallback for orphaned callers).
+  const payload = { to: msg.to, type: 'text' as const, text: msg.body }
 
   try {
     const res = await fetch(`${BASE.replace(/\/$/, '')}/api/v1/messages`, {
@@ -80,14 +74,10 @@ export async function sendMessage(msg: OutboundMessage): Promise<SendResult> {
  * 10s timeout, graceful failure when unconfigured) — only the payload
  * differs.
  *
- * ⚠️ TODO(verify): the exact template payload shape below is modeled on
- * WhatsApp's standard template message (name + language + ordered body
- * parameters) but has NOT yet been confirmed against wacrm's real public
- * API — the same caveat `deployment.md` raises for the existing send
- * contract. If wacrm expects a different envelope (e.g. a `template_payload`
- * wrapper mirroring `interactive_payload`, or named rather than positional
- * params), change it HERE only; callers and the reminder cron are
- * insulated from the wire shape.
+ * Payload shape confirmed against wacrm's docs/public-api.md:
+ *   { to, type:'template', template: { name, language, params: [...] } }
+ * where `params` are the ordered positional body vars ({{1}}, {{2}}, …).
+ * (An earlier draft used `body_params`, which wacrm does not accept.)
  */
 export async function sendTemplate(tpl: OutboundTemplate): Promise<SendResult> {
   if (!BASE || !KEY) {
@@ -100,8 +90,8 @@ export async function sendTemplate(tpl: OutboundTemplate): Promise<SendResult> {
     template: {
       name: tpl.templateName,
       language: tpl.languageCode ?? 'en',
-      // WhatsApp fills body {{1}}, {{2}}, ... from this ordered list.
-      body_params: tpl.bodyParams,
+      // wacrm fills body {{1}}, {{2}}, ... from this ordered list.
+      params: tpl.bodyParams,
     },
   }
 

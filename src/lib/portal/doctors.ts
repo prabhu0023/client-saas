@@ -21,7 +21,13 @@ export async function getDoctorNameMap(
   })
 
   if (error) {
-    console.error('[portal/doctors] clinic_doctor_names failed:', error.message)
+    // Expected until migration 010 is applied (the function won't exist);
+    // callers fall back to specialty. Warn rather than error so a
+    // not-yet-deployed function doesn't surface as a scary Console Error.
+    console.warn(
+      '[portal/doctors] clinic_doctor_names unavailable (falling back to specialty):',
+      error.message,
+    )
     return new Map()
   }
 

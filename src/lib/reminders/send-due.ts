@@ -21,7 +21,7 @@ import { localDayLabel, localTimeLabel } from '@/lib/availability/timezone'
  */
 
 /** Approved Meta template name for the appointment reminder. */
-const TEMPLATE_NAME = process.env.REMINDER_TEMPLATE_NAME ?? 'appointment_reminder'
+const TEMPLATE_NAME = process.env.REMINDER_TEMPLATE_NAME ?? 'doctordesk_appointment_reminder'
 
 /** How far ahead to remind, in minutes (default 24h). */
 const LEAD_MINUTES = Number(process.env.REMINDER_LEAD_MINUTES ?? 24 * 60)

@@ -60,7 +60,7 @@ describe('notifyPatientCancelled', () => {
       bodyParams: string[]
     }
     expect(arg.to).toBe('+919876543210')
-    expect(arg.templateName).toBe('appointment_cancelled')
+    expect(arg.templateName).toBe('doctordesk_appointment_cancelled')
     expect(arg.bodyParams[0]).toBe('Demo Clinic')
     // Time rendered in Asia/Kolkata (+05:30): 09:00 AM.
     expect(arg.bodyParams[2]).toContain('9:00')

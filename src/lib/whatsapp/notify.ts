@@ -21,7 +21,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  */
 
 const CANCELLATION_TEMPLATE_NAME =
-  process.env.CANCELLATION_TEMPLATE_NAME ?? 'appointment_cancelled'
+  process.env.CANCELLATION_TEMPLATE_NAME ?? 'doctordesk_appointment_cancelled'
 
 interface NotifyRow {
   starts_at: string

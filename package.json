@@ -1,8 +1,8 @@
 {
-  "name": "clinic-saas",
+  "name": "doctordesk",
   "version": "0.1.0",
   "private": true,
-  "description": "WhatsApp-first, multi-tenant clinic appointment SaaS. Patients book over WhatsApp; staff use a web portal.",
+  "description": "DoctorDesk — WhatsApp-first, multi-tenant clinic appointment SaaS. Patients book over WhatsApp; staff use a web portal.",
   "engines": {
     "node": ">=20.0.0"
   },

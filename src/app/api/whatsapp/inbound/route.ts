@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { verifyWacrmSignature } from '@/lib/whatsapp/verify-signature'
+import { checkWacrmSignature } from '@/lib/whatsapp/verify-signature'
 import { resolveClinicIdByWacrmAccount } from '@/lib/clinics/resolve-by-account'
 import { resolveContactPhone } from '@/lib/whatsapp/wacrm-client'
 import { loadSession } from '@/lib/whatsapp/session'
@@ -33,7 +33,20 @@ export async function POST(request: Request) {
   // Read the RAW body first — the HMAC is computed over these exact bytes.
   const rawBody = await request.text()
   const signature = request.headers.get('x-wacrm-signature')
-  if (!verifyWacrmSignature(signature, rawBody, secret)) {
+  const sig = checkWacrmSignature(signature, rawBody, secret)
+  if (!sig.ok) {
+    // Log the NAMED reason so a 401 is diagnosable without exposing the
+    // secret or body. `hmac_mismatch` => the Vercel WACRM_WEBHOOK_SECRET
+    // doesn't match the secret wacrm signs with (re-register the webhook
+    // for THIS deployment's URL and set the printed secret). `timestamp_skew`
+    // => clock/replay issue (skewSeconds shows how far off). `missing_header`
+    // / `malformed_header` => not a genuine wacrm delivery or a proxy stripped
+    // the header.
+    console.error(
+      `[wa/inbound] signature check failed: ${sig.reason}` +
+        (sig.skewSeconds !== undefined ? ` (skew=${sig.skewSeconds}s)` : '') +
+        ` headerPresent=${signature !== null}`,
+    )
     return NextResponse.json({ error: 'bad signature' }, { status: 401 })
   }
 

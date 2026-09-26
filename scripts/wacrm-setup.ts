@@ -113,6 +113,41 @@ async function verify() {
   }
 }
 
+async function list() {
+  const hooks = await api('GET', '/api/v1/webhooks')
+  if (hooks.status !== 200) {
+    console.error(
+      `GET /api/v1/webhooks failed (${hooks.status}; needs webhooks:manage):`,
+      JSON.stringify(hooks.json),
+    )
+    process.exit(1)
+  }
+  const listed =
+    (hooks.json as { data?: Array<{ id: string; url: string; events: string[]; is_active?: boolean }> })
+      .data ?? []
+  if (!listed.length) {
+    console.log('No webhooks registered.')
+    return
+  }
+  console.log(`${listed.length} webhook(s):`)
+  for (const h of listed) {
+    console.log(
+      `  ${h.id}  ${h.url} [${h.events.join(', ')}]${h.is_active === false ? ' (inactive)' : ''}`,
+    )
+  }
+  console.log('\nDelete a stale one with:')
+  console.log('  npx tsx scripts/wacrm-setup.ts delete <id>')
+}
+
+async function del(id: string) {
+  const res = await api('DELETE', `/api/v1/webhooks/${encodeURIComponent(id)}`)
+  if (res.status !== 200 && res.status !== 204) {
+    console.error(`delete failed (${res.status}):`, JSON.stringify(res.json))
+    process.exit(1)
+  }
+  console.log(`Deleted webhook ${id}.`)
+}
+
 async function register(url: string) {
   if (!/^https:\/\//.test(url)) {
     console.error('Webhook URL must be https:// (wacrm refuses http/localhost).')
@@ -139,6 +174,15 @@ async function main() {
   const cmd = process.argv[2] ?? 'verify'
   if (cmd === 'verify') {
     await verify()
+  } else if (cmd === 'list') {
+    await list()
+  } else if (cmd === 'delete') {
+    const id = process.argv[3]
+    if (!id) {
+      console.error('Usage: npx tsx scripts/wacrm-setup.ts delete <webhook-id>')
+      process.exit(1)
+    }
+    await del(id)
   } else if (cmd === 'register') {
     const url = process.argv[3]
     if (!url) {
@@ -147,7 +191,7 @@ async function main() {
     }
     await register(url)
   } else {
-    console.error(`Unknown command "${cmd}". Use "verify" or "register".`)
+    console.error(`Unknown command "${cmd}". Use "verify", "list", "delete", or "register".`)
     process.exit(1)
   }
 }

@@ -1,3 +1,8 @@
+> ⚠️ **ARCHIVED / superseded.** MVP epics E1–E7 are all done. Current feature
+> states live in `../product-requirements.md` §4; the live execution board is
+> §17 (and `../production-board.md`). Kept for history; not maintained. See
+> `./README.md`.
+
 # Clinic SaaS — MVP Delivery Roadmap
 
 > Ordered, ticket-by-ticket plan to take the product from its current state to a
@@ -270,7 +275,11 @@ changes reach the patient. Completes the "real appointment" story.
 - **Acceptance:** navigate days without retyping dates; counts per day visible.
 - **Deps:** E6-T1.
 
-### E6-T3 — Clinic switcher (if a user is in >1 clinic)
+### E6-T3 — Clinic switcher (if a user is in >1 clinic) ⏭️ DEFERRED (out of MVP)
+- **Decision:** deferred. MVP staff are single-clinic (the seed only creates
+  single-clinic members) and `requireStaff()` already handles a multi-clinic
+  user gracefully by picking the first active membership — nothing is broken
+  without a switcher. Revisit when a real multi-clinic staff user exists.
 - **Scope:** `requireStaff()` picks the first active membership. Add a switcher
   when a user belongs to multiple clinics.
 - **Acceptance:** switching clinic re-scopes the dashboard; default stays the

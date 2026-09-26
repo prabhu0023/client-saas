@@ -12,6 +12,7 @@ import {
 import Link from 'next/link'
 import type { AppointmentStatus } from '@/types'
 import { updateAppointmentStatus } from './actions'
+import { KanbanBoard, type BoardCard } from './KanbanBoard'
 import styles from './dashboard.module.css'
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/
@@ -34,16 +35,21 @@ const ACTION_LABEL: Record<AppointmentStatus, string> = {
   no_show: 'No-show',
 }
 
+
+
+type ViewMode = 'board' | 'agenda'
+
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string }>
+  searchParams: Promise<{ date?: string; view?: string }>
 }) {
   const { clinic } = await requireStaff()
-  const { date } = await searchParams
+  const { date, view } = await searchParams
 
   const dateYmd =
     date && YMD.test(date) ? date : todayYmdInTimeZone(clinic.timezone)
+  const viewMode: ViewMode = view === 'agenda' ? 'agenda' : 'board'
 
   const [appointments, doctorNames] = await Promise.all([
     getAppointmentsForDay({
@@ -61,6 +67,17 @@ export default async function DashboardPage({
   const nextYmd = addDaysYmd(dateYmd, 1)
   const count = appointments.length
 
+  // Build a dashboard URL preserving the current view (and optionally the
+  // date). Keeps the day nav + view toggle from clobbering each other.
+  const href = (opts: { date?: string; view?: ViewMode }): string => {
+    const params = new URLSearchParams()
+    if (opts.date) params.set('date', opts.date)
+    const v = opts.view ?? viewMode
+    if (v !== 'board') params.set('view', v)
+    const qs = params.toString()
+    return qs ? `/dashboard?${qs}` : '/dashboard'
+  }
+
   return (
     <div>
       <div className={styles.head}>
@@ -75,21 +92,36 @@ export default async function DashboardPage({
         </div>
 
         <div className={styles.nav}>
+          <div className={styles.viewToggle}>
+            <Link
+              className={`${styles.viewBtn} ${viewMode === 'board' ? styles.viewActive : ''}`}
+              href={href({ date: dateYmd, view: 'board' })}
+            >
+              Board
+            </Link>
+            <Link
+              className={`${styles.viewBtn} ${viewMode === 'agenda' ? styles.viewActive : ''}`}
+              href={href({ date: dateYmd, view: 'agenda' })}
+            >
+              Agenda
+            </Link>
+          </div>
+
           <Link
             className={styles.navBtn}
-            href={`/dashboard?date=${prevYmd}`}
+            href={href({ date: prevYmd })}
             aria-label="Previous day"
           >
             ‹
           </Link>
           {dateYmd !== todayYmd && (
-            <Link className={styles.today} href="/dashboard">
+            <Link className={styles.today} href={href({ view: viewMode })}>
               Today
             </Link>
           )}
           <Link
             className={styles.navBtn}
-            href={`/dashboard?date=${nextYmd}`}
+            href={href({ date: nextYmd })}
             aria-label="Next day"
           >
             ›
@@ -101,6 +133,9 @@ export default async function DashboardPage({
               name="date"
               defaultValue={dateYmd}
             />
+            {viewMode !== 'board' && (
+              <input type="hidden" name="view" value={viewMode} />
+            )}
             <button className={styles.action} type="submit">
               Go
             </button>
@@ -110,10 +145,10 @@ export default async function DashboardPage({
 
       {appointments.length === 0 ? (
         <div className={styles.empty}>No appointments for this day.</div>
-      ) : (
-        <div className={styles.list}>
+      ) : viewMode === 'agenda' ? (
+        <div className={styles.agenda}>
           {appointments.map((appt) => (
-            <AppointmentRow
+            <AgendaRow
               key={appt.id}
               appt={appt}
               dateYmd={dateYmd}
@@ -121,9 +156,29 @@ export default async function DashboardPage({
             />
           ))}
         </div>
+      ) : (
+        <KanbanBoard cards={toBoardCards(appointments, doctorNames)} dateYmd={dateYmd} />
       )}
     </div>
   )
+}
+
+/** Shape appointments into serializable cards for the client board. */
+function toBoardCards(
+  appointments: DashboardAppointment[],
+  names: Map<string, string>,
+): BoardCard[] {
+  return appointments.map((a) => ({
+    id: a.id,
+    status: a.status,
+    startLabel: a.startLabel,
+    endLabel: a.endLabel,
+    patientName: a.patientName,
+    patientPhone: a.patientPhone,
+    serviceName: a.serviceName,
+    doctorLabel: resolveDoctorLabel(a, names),
+    createdVia: a.createdVia,
+  }))
 }
 
 /**
@@ -141,7 +196,12 @@ function resolveDoctorLabel(
   return appt.doctorSpecialty
 }
 
-function AppointmentRow({
+/**
+ * Agenda view row: appointments in chronological order (they arrive
+ * ordered by starts_at), one per line, with a status badge and the same
+ * transition actions as the board. Good for reading the day top-to-bottom.
+ */
+function AgendaRow({
   appt,
   dateYmd,
   doctorLabel,

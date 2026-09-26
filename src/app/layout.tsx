@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 
 export const metadata: Metadata = {
-  title: 'Clinic SaaS',
+  title: 'DoctorDesk',
   description: 'WhatsApp-first clinic appointment platform',
 }
 

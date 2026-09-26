@@ -176,3 +176,212 @@
 .today:hover {
   background: #f3f4f6;
 }
+
+/* --- kanban board --- */
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: stretch;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  background: #f0f1f3;
+  border: 1px solid #e4e6eb;
+  border-radius: 12px;
+  padding: 10px;
+  min-width: 180px;
+}
+
+.columnHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 2px 10px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid #e4e6eb;
+}
+
+.columnDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  flex: none;
+  /* Saturated dot color set per status below; do NOT reuse the pale
+     badge fills (.booked/.confirmed/…) which read as washed-out here. */
+  background: #9ca3af;
+}
+
+.columnTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.columnCount {
+  margin-left: auto;
+  flex: none;
+  min-width: 22px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  background: #fff;
+  border: 1px solid #e4e6eb;
+  border-radius: 999px;
+  padding: 0 7px;
+}
+
+/* Saturated dot colors, keyed by the status modifier on .columnDot. */
+.columnDot.booked {
+  background: #f59e0b;
+}
+.columnDot.confirmed {
+  background: #10b981;
+}
+.columnDot.completed {
+  background: #3b82f6;
+}
+.columnDot.cancelled {
+  background: #ef4444;
+}
+.columnDot.no_show {
+  background: #9ca3af;
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 48px;
+}
+
+.columnEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  color: #b6bbc2;
+  font-size: 13px;
+  min-height: 40px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #e4e6eb;
+  border-radius: 10px;
+}
+
+.cardTime {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.cardPatient {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.cardMeta {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.cardActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+/* --- view toggle + agenda --- */
+
+.viewToggle {
+  display: inline-flex;
+  background: #e5e7eb;
+  border-radius: 8px;
+  padding: 2px;
+  margin-right: 4px;
+}
+
+.viewBtn {
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  text-decoration: none;
+  border-radius: 6px;
+}
+
+.viewBtn:hover {
+  color: #374151;
+}
+
+.viewActive {
+  color: #111827;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.agenda {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* --- drag and drop --- */
+
+.cardDraggable {
+  cursor: grab;
+}
+
+.cardDraggable:active {
+  cursor: grabbing;
+}
+
+.cardDragging {
+  opacity: 0.5;
+}
+
+.columnOver {
+  background: #e0e7ff;
+  border-color: #a5b4fc;
+  outline: 2px dashed #a5b4fc;
+  outline-offset: -2px;
+}
+
+.columnDisabled {
+  opacity: 0.55;
+}
+
+.boardBusy {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.boardError {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #991b1b;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+}
