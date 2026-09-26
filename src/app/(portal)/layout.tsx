@@ -29,6 +29,9 @@ export default async function PortalLayout({
           <Link className={styles.navLink} href="/dashboard">
             Appointments
           </Link>
+          <Link className={styles.navLink} href="/availability">
+            Availability
+          </Link>
         </nav>
 
         <div className={styles.right}>

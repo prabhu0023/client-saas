@@ -238,7 +238,7 @@ changes reach the patient. Completes the "real appointment" story.
 
 **Goal:** staff configure availability without SQL. Today it's seed-only.
 
-### E5-T1 — View current availability
+### E5-T1 — View current availability ✅ DONE
 - **Scope:** a portal screen listing a doctor's `availability_rules` (weekly) and
   upcoming `availability_exceptions`, RLS-scoped.
 - **Acceptance:** staff see the rules that drive the WhatsApp day/time lists.

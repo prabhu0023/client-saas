@@ -1,0 +1,185 @@
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.sub {
+  margin: 0 0 20px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pickerLabel {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.select {
+  padding: 7px 10px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.action {
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.action:hover {
+  background: #f3f4f6;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e4e6eb;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+
+.cardTitle {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.week {
+  display: flex;
+  flex-direction: column;
+}
+
+.dayRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f1f3;
+}
+
+.dayRow:last-child {
+  border-bottom: none;
+}
+
+.dayName {
+  min-width: 96px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+}
+
+.windows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.window {
+  display: inline-block;
+  padding: 3px 10px;
+  font-size: 13px;
+  color: #065f46;
+  background: #d1fae5;
+  border-radius: 999px;
+}
+
+.inactive {
+  color: #6b7280;
+  background: #e5e7eb;
+  text-decoration: line-through;
+}
+
+.closed {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.exceptions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.exRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f1f3;
+}
+
+.exRow:last-child {
+  border-bottom: none;
+}
+
+.exDate {
+  min-width: 110px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+}
+
+.exDetail {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.exBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+}
+
+.exOff {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.exExtra {
+  color: #1e40af;
+  background: #dbeafe;
+}
+
+.exText {
+  font-size: 13px;
+  color: #374151;
+}
+
+.empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: #6b7280;
+  background: #fff;
+  border: 1px solid #e4e6eb;
+  border-radius: 12px;
+}
+
+.emptyInline {
+  font-size: 13px;
+  color: #9ca3af;
+}
