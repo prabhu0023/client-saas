@@ -244,7 +244,7 @@ changes reach the patient. Completes the "real appointment" story.
 - **Acceptance:** staff see the rules that drive the WhatsApp day/time lists.
 - **Deps:** E1 complete.
 
-### E5-T2 — Edit weekly rules + exceptions
+### E5-T2 — Edit weekly rules + exceptions ✅ DONE
 - **Scope:** create/update/deactivate `availability_rules`; add `off`/`extra`
   `availability_exceptions` for specific dates. Validate against the schema checks.
 - **Acceptance:** a rule change immediately alters the slots the WhatsApp flow

@@ -7,6 +7,13 @@ import {
 } from '@/lib/portal/availability'
 import { todayYmdInTimeZone } from '@/lib/availability/timezone'
 import type { AvailabilityRule, AvailabilityException } from '@/types'
+import {
+  addRule,
+  toggleRule,
+  deleteRule,
+  addException,
+  deleteException,
+} from './actions'
 import styles from './availability.module.css'
 
 /** Trim 'HH:mm:ss' → 'HH:mm' for display. */
@@ -102,22 +109,50 @@ export default async function AvailabilityPage({
                   <span className={styles.closed}>Closed</span>
                 ) : (
                   byWeekday[day].map((r) => (
-                    <span
-                      key={r.id}
-                      className={`${styles.window} ${
-                        r.active ? '' : styles.inactive
-                      }`}
-                    >
-                      {hhmm(r.start_time)}–{hhmm(r.end_time)}
-                      {r.slot_minutes ? ` · ${r.slot_minutes}m` : ''}
-                      {r.active ? '' : ' (off)'}
-                    </span>
+                    <RuleChip key={r.id} rule={r} doctorId={selectedId} />
                   ))
                 )}
               </div>
             </div>
           ))}
         </div>
+
+        <form className={styles.addForm} action={addRule}>
+          <input type="hidden" name="doctorId" value={selectedId} />
+          <select className={styles.smallSelect} name="weekday" defaultValue="1">
+            {WEEKDAY_LABELS.map((label, day) => (
+              <option key={label} value={day}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <input
+            className={styles.timeInput}
+            type="time"
+            name="startTime"
+            required
+            aria-label="Start time"
+          />
+          <span className={styles.dash}>–</span>
+          <input
+            className={styles.timeInput}
+            type="time"
+            name="endTime"
+            required
+            aria-label="End time"
+          />
+          <input
+            className={styles.slotInput}
+            type="number"
+            name="slotMinutes"
+            min="1"
+            placeholder="slot min"
+            aria-label="Slot minutes (optional)"
+          />
+          <button className={styles.addBtn} type="submit">
+            Add hours
+          </button>
+        </form>
       </section>
 
       <section className={styles.card}>
@@ -129,16 +164,85 @@ export default async function AvailabilityPage({
         ) : (
           <div className={styles.exceptions}>
             {exceptions.map((e) => (
-              <ExceptionRow key={e.id} exception={e} />
+              <ExceptionRow key={e.id} exception={e} doctorId={selectedId} />
             ))}
           </div>
         )}
+
+        <form className={styles.addForm} action={addException}>
+          <input type="hidden" name="doctorId" value={selectedId} />
+          <input
+            className={styles.timeInput}
+            type="date"
+            name="date"
+            min={todayYmd}
+            required
+            aria-label="Exception date"
+          />
+          <select className={styles.smallSelect} name="kind" defaultValue="off">
+            <option value="off">Off</option>
+            <option value="extra">Extra</option>
+          </select>
+          <input
+            className={styles.timeInput}
+            type="time"
+            name="startTime"
+            aria-label="Start time (optional for whole-day off)"
+          />
+          <span className={styles.dash}>–</span>
+          <input
+            className={styles.timeInput}
+            type="time"
+            name="endTime"
+            aria-label="End time (optional for whole-day off)"
+          />
+          <button className={styles.addBtn} type="submit">
+            Add exception
+          </button>
+        </form>
+        <p className={styles.hint}>
+          Leave times blank on an <strong>Off</strong> to block the whole day.
+          <strong> Extra</strong> hours need a start and end.
+        </p>
       </section>
     </div>
   )
 }
 
-function ExceptionRow({ exception }: { exception: AvailabilityException }) {
+function RuleChip({ rule, doctorId }: { rule: AvailabilityRule; doctorId: string }) {
+  return (
+    <span
+      className={`${styles.window} ${rule.active ? '' : styles.inactive}`}
+    >
+      {hhmm(rule.start_time)}–{hhmm(rule.end_time)}
+      {rule.slot_minutes ? ` · ${rule.slot_minutes}m` : ''}
+      {rule.active ? '' : ' (off)'}
+      <form className={styles.chipForm} action={toggleRule}>
+        <input type="hidden" name="id" value={rule.id} />
+        <input type="hidden" name="doctorId" value={doctorId} />
+        <input type="hidden" name="active" value={(!rule.active).toString()} />
+        <button className={styles.chipBtn} type="submit" title={rule.active ? 'Disable' : 'Enable'}>
+          {rule.active ? '⏸' : '▶'}
+        </button>
+      </form>
+      <form className={styles.chipForm} action={deleteRule}>
+        <input type="hidden" name="id" value={rule.id} />
+        <input type="hidden" name="doctorId" value={doctorId} />
+        <button className={styles.chipBtn} type="submit" title="Remove">
+          ✕
+        </button>
+      </form>
+    </span>
+  )
+}
+
+function ExceptionRow({
+  exception,
+  doctorId,
+}: {
+  exception: AvailabilityException
+  doctorId: string
+}) {
   const isOff = exception.kind === 'off'
   const wholeDay = !exception.start_time && !exception.end_time
   const range =
@@ -163,6 +267,13 @@ function ExceptionRow({ exception }: { exception: AvailabilityException }) {
             : `Extra hours ${range}`}
         </span>
       </div>
+      <form action={deleteException}>
+        <input type="hidden" name="id" value={exception.id} />
+        <input type="hidden" name="doctorId" value={doctorId} />
+        <button className={styles.exDelete} type="submit" title="Remove">
+          ✕
+        </button>
+      </form>
     </div>
   )
 }
