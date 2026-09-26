@@ -4,7 +4,12 @@ import {
   type DashboardAppointment,
 } from '@/lib/portal/appointments'
 import { getDoctorNameMap } from '@/lib/portal/doctors'
-import { todayYmdInTimeZone, localDayLabel } from '@/lib/availability/timezone'
+import {
+  todayYmdInTimeZone,
+  localDayLabel,
+  addDaysYmd,
+} from '@/lib/availability/timezone'
+import Link from 'next/link'
 import type { AppointmentStatus } from '@/types'
 import { updateAppointmentStatus } from './actions'
 import styles from './dashboard.module.css'
@@ -51,22 +56,56 @@ export default async function DashboardPage({
 
   // A representative label for the day header, rendered in clinic tz.
   const dayLabel = localDayLabel(new Date(`${dateYmd}T12:00:00Z`), 'UTC')
+  const todayYmd = todayYmdInTimeZone(clinic.timezone)
+  const prevYmd = addDaysYmd(dateYmd, -1)
+  const nextYmd = addDaysYmd(dateYmd, 1)
+  const count = appointments.length
 
   return (
     <div>
       <div className={styles.head}>
-        <h1 className={styles.title}>Appointments · {dayLabel}</h1>
-        <form className={styles.dateForm} method="get">
-          <input
-            className={styles.dateInput}
-            type="date"
-            name="date"
-            defaultValue={dateYmd}
-          />
-          <button className={styles.action} type="submit">
-            Go
-          </button>
-        </form>
+        <div>
+          <h1 className={styles.title}>Appointments · {dayLabel}</h1>
+          <div className={styles.count}>
+            {count === 0
+              ? 'No appointments'
+              : `${count} appointment${count === 1 ? '' : 's'}`}
+            {dateYmd !== todayYmd ? '' : ' · today'}
+          </div>
+        </div>
+
+        <div className={styles.nav}>
+          <Link
+            className={styles.navBtn}
+            href={`/dashboard?date=${prevYmd}`}
+            aria-label="Previous day"
+          >
+            ‹
+          </Link>
+          {dateYmd !== todayYmd && (
+            <Link className={styles.today} href="/dashboard">
+              Today
+            </Link>
+          )}
+          <Link
+            className={styles.navBtn}
+            href={`/dashboard?date=${nextYmd}`}
+            aria-label="Next day"
+          >
+            ›
+          </Link>
+          <form className={styles.dateForm} method="get">
+            <input
+              className={styles.dateInput}
+              type="date"
+              name="date"
+              defaultValue={dateYmd}
+            />
+            <button className={styles.action} type="submit">
+              Go
+            </button>
+          </form>
+        </div>
       </div>
 
       {appointments.length === 0 ? (

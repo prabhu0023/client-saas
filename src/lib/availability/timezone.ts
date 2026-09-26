@@ -71,3 +71,14 @@ export function localDayLabel(utc: Date, timeZone: string): string {
 export function todayYmdInTimeZone(timeZone: string, now: Date = new Date()): string {
   return formatInTimeZone(now, timeZone, 'yyyy-MM-dd')
 }
+
+/**
+ * Calendar-day arithmetic on a 'YYYY-MM-DD' string: returns the date
+ * `delta` days away as 'YYYY-MM-DD'. Anchored at UTC noon so DST never
+ * shifts the calendar day. `delta` may be negative.
+ */
+export function addDaysYmd(dateYmd: string, delta: number): string {
+  const d = new Date(`${dateYmd}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + delta)
+  return d.toISOString().slice(0, 10)
+}

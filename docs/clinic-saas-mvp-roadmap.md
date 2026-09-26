@@ -264,7 +264,7 @@ changes reach the patient. Completes the "real appointment" story.
 - **Acceptance:** dashboard shows the treating doctor's name; no cross-clinic leak.
 - **Deps:** E1 complete.
 
-### E6-T2 — Multi-day / week view
+### E6-T2 — Multi-day / week view ✅ DONE
 - **Scope:** the dashboard shows one day; add next/prev day and a simple week
   overview so staff aren't clicking a date picker per day.
 - **Acceptance:** navigate days without retyping dates; counts per day visible.
