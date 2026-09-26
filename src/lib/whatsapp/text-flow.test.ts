@@ -1,0 +1,246 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { WaSession } from './session'
+
+/**
+ * Integration test for the text-driven booking flow (E2-T1).
+ *
+ * Drives `handleTextMessage` through the full conversation as a patient
+ * would — feeding inbound free text and asserting the outbound reply and
+ * the resulting session state at each step:
+ *
+ *   idle → (keyword) → awaiting_doctor → awaiting_day → awaiting_time → book
+ *
+ * Everything at the module boundary is stubbed: the session store is an
+ * in-memory map, the DB-backed query loaders and slot generation return
+ * fixtures, and booking returns a scripted outcome. The timezone helpers
+ * and the pure message builders run for real, so the asserted reply text
+ * is exactly what a patient would receive.
+ */
+
+// ------------------------------------------------------------
+// In-memory session store standing in for wa_sessions.
+// ------------------------------------------------------------
+const sessions = new Map<string, WaSession>()
+
+const loadSessionMock = vi.fn(async (conversationId: string) =>
+  sessions.get(conversationId) ?? null,
+)
+const saveSessionMock = vi.fn(async (session: WaSession) => {
+  sessions.set(session.conversationId, session)
+})
+const clearSessionMock = vi.fn(async (conversationId: string) => {
+  sessions.delete(conversationId)
+})
+
+vi.mock('./session', async () => {
+  // Keep the real matchOption (pure); only stub the persistence fns.
+  const actual = await vi.importActual<typeof import('./session')>('./session')
+  return {
+    ...actual,
+    loadSession: (id: string) => loadSessionMock(id),
+    saveSession: (s: WaSession) => saveSessionMock(s),
+    clearSession: (id: string) => clearSessionMock(id),
+  }
+})
+
+// ------------------------------------------------------------
+// DB-backed query loaders (doctors / days / slot length).
+// ------------------------------------------------------------
+const loadDoctorOptionsMock = vi.fn()
+const loadDoctorLabelMock = vi.fn()
+const loadDoctorSlotMinutesMock = vi.fn()
+const loadAvailableDaysMock = vi.fn()
+
+vi.mock('./query', () => ({
+  loadDoctorOptions: (...a: unknown[]) => loadDoctorOptionsMock(...a),
+  loadDoctorLabel: (...a: unknown[]) => loadDoctorLabelMock(...a),
+  loadDoctorSlotMinutes: (...a: unknown[]) => loadDoctorSlotMinutesMock(...a),
+  loadAvailableDays: (...a: unknown[]) => loadAvailableDaysMock(...a),
+}))
+
+// ------------------------------------------------------------
+// Slot generation + booking.
+// ------------------------------------------------------------
+const generateSlotsMock = vi.fn()
+vi.mock('@/lib/availability/slot-generation', () => ({
+  generateSlots: (...a: unknown[]) => generateSlotsMock(...a),
+}))
+
+const bookAppointmentMock = vi.fn()
+vi.mock('@/lib/booking/book', () => ({
+  bookAppointment: (...a: unknown[]) => bookAppointmentMock(...a),
+}))
+
+// ------------------------------------------------------------
+// loadClinic() reads clinics via supabaseAdmin(); return a fixed clinic.
+// ------------------------------------------------------------
+const CLINIC = { id: 'clinic-1', timezone: 'Asia/Kolkata' }
+vi.mock('@/lib/supabase/admin', () => ({
+  supabaseAdmin: () => ({
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({ data: CLINIC, error: null }),
+        }),
+      }),
+    }),
+  }),
+}))
+
+import { handleTextMessage, type TextFlowInput } from './text-flow'
+
+// ------------------------------------------------------------
+// Fixtures + helpers.
+// ------------------------------------------------------------
+const CONV = 'conv-1'
+const PHONE = '+919876543210'
+
+const TWO_DOCTORS = [
+  { id: 'doc-rao', label: 'Dr. Rao (General)' },
+  { id: 'doc-iyer', label: 'Dr. Iyer (Pediatrics)' },
+]
+
+const DAYS = [
+  { doctorId: 'doc-rao', dateYmd: '2026-09-28', label: 'Mon, Sep 28' },
+  { doctorId: 'doc-rao', dateYmd: '2026-09-29', label: 'Tue, Sep 29' },
+]
+
+// Two slots on the chosen day (hhmm is the id the flow books from).
+const SLOTS = [
+  {
+    doctorId: 'doc-rao',
+    startsAtUtc: '2026-09-28T03:30:00.000Z',
+    endsAtUtc: '2026-09-28T04:00:00.000Z',
+    localLabel: '9:00 AM',
+    hhmm: '0900',
+  },
+  {
+    doctorId: 'doc-rao',
+    startsAtUtc: '2026-09-28T04:00:00.000Z',
+    endsAtUtc: '2026-09-28T04:30:00.000Z',
+    localLabel: '9:30 AM',
+    hhmm: '0930',
+  },
+]
+
+function input(text: string): TextFlowInput {
+  return { clinicId: CLINIC.id, conversationId: CONV, waPhone: PHONE, text }
+}
+
+async function send(text: string) {
+  return handleTextMessage(input(text))
+}
+
+beforeEach(() => {
+  sessions.clear()
+  vi.clearAllMocks()
+  // Sensible defaults; individual tests override as needed.
+  loadDoctorOptionsMock.mockResolvedValue(TWO_DOCTORS)
+  loadDoctorLabelMock.mockResolvedValue('Dr. Rao (General)')
+  loadDoctorSlotMinutesMock.mockResolvedValue(30)
+  loadAvailableDaysMock.mockResolvedValue(DAYS)
+  generateSlotsMock.mockResolvedValue(SLOTS)
+  bookAppointmentMock.mockResolvedValue({
+    status: 'booked',
+    appointmentId: 'appt-1',
+    patientId: 'pat-1',
+  })
+})
+
+describe('handleTextMessage — full booking flow', () => {
+  it('books end to end: keyword → doctor → day → time → confirmation', async () => {
+    // 1. Keyword starts the flow → doctor menu.
+    const r1 = await send('I need an appointment')
+    expect(r1?.body).toContain('Which doctor')
+    expect(r1?.body).toContain('1. Dr. Rao (General)')
+    expect(sessions.get(CONV)?.step).toBe('awaiting_doctor')
+
+    // 2. Pick doctor 1 → day menu.
+    const r2 = await send('1')
+    expect(r2?.body).toContain('Which day')
+    expect(r2?.body).toContain('1. Mon, Sep 28')
+    expect(sessions.get(CONV)?.step).toBe('awaiting_day')
+    expect(sessions.get(CONV)?.data.doctorId).toBe('doc-rao')
+
+    // 3. Pick day 1 → time menu.
+    const r3 = await send('1')
+    expect(r3?.body).toContain('pick a time')
+    expect(r3?.body).toContain('1. 9:00 AM')
+    expect(sessions.get(CONV)?.step).toBe('awaiting_time')
+    expect(sessions.get(CONV)?.data.dateYmd).toBe('2026-09-28')
+
+    // 4. Pick time 1 → booked + confirmation, session cleared.
+    const r4 = await send('1')
+    expect(bookAppointmentMock).toHaveBeenCalledTimes(1)
+    expect(r4?.body).toContain('Confirmed!')
+    expect(r4?.body).toContain('Dr. Rao (General)')
+    expect(sessions.has(CONV)).toBe(false)
+  })
+
+  it('single-doctor clinic skips the doctor step and goes to days', async () => {
+    loadDoctorOptionsMock.mockResolvedValue([TWO_DOCTORS[0]])
+
+    const r1 = await send('appointment')
+    // Straight to the day menu; no doctor prompt.
+    expect(r1?.body).toContain('Which day')
+    expect(sessions.get(CONV)?.step).toBe('awaiting_day')
+    expect(sessions.get(CONV)?.data.doctorId).toBe('doc-rao')
+  })
+})
+
+describe('handleTextMessage — non-happy paths', () => {
+  it('no session + non-keyword text → fallback nudge, no session created', async () => {
+    const r = await send('where are you located?')
+    expect(r?.body).toContain('reply with "appointment"')
+    expect(sessions.has(CONV)).toBe(false)
+  })
+
+  it('unrecognized reply at the doctor step → did-not-understand, stays put', async () => {
+    await send('appointment') // → awaiting_doctor
+    const r = await send('the third one please')
+    expect(r?.body).toContain("didn't catch that")
+    // Still awaiting a doctor pick.
+    expect(sessions.get(CONV)?.step).toBe('awaiting_doctor')
+    expect(bookAppointmentMock).not.toHaveBeenCalled()
+  })
+
+  it('slot taken mid-flow → re-offers the day’s times, session stays at time step', async () => {
+    bookAppointmentMock.mockResolvedValue({ status: 'slot_taken' })
+
+    await send('appointment') // doctor menu
+    await send('1') // day menu
+    await send('1') // time menu
+    const r = await send('1') // attempt booking → slot_taken
+
+    // Recovery: the time menu is shown again (still the same two slots).
+    expect(r?.body).toContain('pick a time')
+    expect(r?.body).toContain('1. 9:00 AM')
+    expect(sessions.get(CONV)?.step).toBe('awaiting_time')
+  })
+
+  it('booking error resets the conversation to a fresh start', async () => {
+    bookAppointmentMock.mockResolvedValue({ status: 'error', message: 'db down' })
+
+    await send('appointment')
+    await send('1')
+    await send('1')
+    const r = await send('1') // booking errors
+
+    expect(r?.body).toContain('reply with "appointment"') // fallback
+    expect(sessions.has(CONV)).toBe(false) // session cleared
+  })
+
+  it('no doctors configured → no-availability message', async () => {
+    loadDoctorOptionsMock.mockResolvedValue([])
+    const r = await send('appointment')
+    expect(r?.body).toContain('no open slots')
+    expect(sessions.has(CONV)).toBe(false)
+  })
+
+  it('doctor has no available days → no-availability message', async () => {
+    loadAvailableDaysMock.mockResolvedValue([])
+    await send('appointment') // doctor menu
+    const r2 = await send('1') // pick doctor → tries days
+    expect(r2?.body).toContain('no open slots')
+  })
+})

@@ -130,6 +130,8 @@ export interface Appointment {
   status: AppointmentStatus
   service_id: string | null
   created_via: CreatedVia
+  /** When the appointment reminder was sent; null = not yet reminded. */
+  reminder_sent_at: string | null
   created_at: string
   updated_at: string
 }
