@@ -224,7 +224,7 @@ changes reach the patient. Completes the "real appointment" story.
   window where the patient has zero or double appointments.
 - **Deps:** E4-T1.
 
-### E4-T3 — Notify patient on staff-side change
+### E4-T3 — Notify patient on staff-side change ✅ DONE
 - **Scope:** when staff cancel/reschedule in the portal (`dashboard/actions.ts`),
   send the patient a WhatsApp message. Within 24h → free-form; outside → template
   (reuses E3-T1).

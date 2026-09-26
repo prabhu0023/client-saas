@@ -212,6 +212,10 @@ reminder window and sends the approved WhatsApp template for each.
      `appointment_reminder`). Its body must accept 3 params in order:
      `{{1}}` clinic name, `{{2}}` day label, `{{3}}` time label.
    - `REMINDER_LEAD_MINUTES` — how far ahead to remind (defaults to `1440` = 24h).
+   - `CANCELLATION_TEMPLATE_NAME` — approved template for staff-initiated
+     cancellation notices (defaults to `appointment_cancelled`; same 3 body
+     params: `{{1}}` clinic, `{{2}}` day, `{{3}}` time). Used by the portal when
+     staff cancel an appointment (E4-T3).
 2. **Scheduler** — e.g. Vercel Cron in `vercel.json` (sends the Bearer secret
    automatically), or any external cron hitting the URL with the secret header:
    ```json

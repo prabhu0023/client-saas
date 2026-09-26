@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireStaff } from '@/lib/portal/auth'
+import { notifyPatientCancelled } from '@/lib/whatsapp/notify'
 import type { AppointmentStatus } from '@/types'
 
 // Statuses a staff member can set from the dashboard. 'booked' is the
@@ -39,6 +40,14 @@ export async function updateAppointmentStatus(formData: FormData): Promise<void>
     .eq('id', id)
 
   if (error) throw new Error(`status update failed: ${error.message}`)
+
+  // Staff-initiated cancellation → tell the patient over WhatsApp.
+  // Best-effort: notification failure must not fail the status change,
+  // which has already committed. Reuses the RLS-scoped client so the
+  // read stays inside the caller's clinic.
+  if (status === 'cancelled') {
+    await notifyPatientCancelled(supabase, id)
+  }
 
   // Revalidate the dashboard (with the date preserved if present).
   revalidatePath('/dashboard')
