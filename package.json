@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "wacrm:setup": "tsx scripts/wacrm-setup.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

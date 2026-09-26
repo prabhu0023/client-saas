@@ -1,83 +1,13 @@
-import type { Slot } from '@/types'
-import { encodeDayId, encodeSlotId } from '@/lib/booking/slot-id'
-import {
-  type ListRow,
-  type OutboundList,
-  type OutboundText,
-  MAX_LIST_ROWS,
-} from './types'
+import type { OutboundText } from './types'
 
 /**
- * Pure message builders for the staged flow (§6). Each returns an
- * OutboundMessage the send adapter delivers via wacrm. All lists are
- * capped at MAX_LIST_ROWS (WhatsApp's hard limit).
+ * Pure message builders for the text-driven WhatsApp flow. Each returns
+ * an OutboundMessage the send adapter delivers via wacrm.
+ *
+ * The wacrm channel forwards only free text (not a tapped interactive-row
+ * id), so the flow uses numbered TEXT menus rather than WhatsApp
+ * interactive lists — see the numbered-text builders below.
  */
-
-export interface DoctorOption {
-  id: string
-  /** Display name for the row, e.g. 'Dr. Rao (Cardiology)'. */
-  label: string
-}
-
-/** An available day: the date plus a human label ('Mon, Sep 22'). */
-export interface DayOption {
-  doctorId: string
-  /** 'YYYY-MM-DD' */
-  dateYmd: string
-  label: string
-}
-
-export function buildDoctorList(
-  to: string,
-  doctors: DoctorOption[],
-): OutboundList {
-  const rows: ListRow[] = doctors.slice(0, MAX_LIST_ROWS).map((d) => ({
-    id: `doc_${d.id}`,
-    title: d.label.slice(0, 24), // WhatsApp row title limit
-  }))
-  return {
-    kind: 'list',
-    to,
-    body: 'Which doctor would you like to see?',
-    buttonLabel: 'Choose doctor',
-    rows,
-  }
-}
-
-export function buildDayList(to: string, days: DayOption[]): OutboundList {
-  const rows: ListRow[] = days.slice(0, MAX_LIST_ROWS).map((d) => ({
-    id: encodeDayId(d.doctorId, d.dateYmd),
-    title: d.label.slice(0, 24),
-  }))
-  return {
-    kind: 'list',
-    to,
-    body: 'Which day works for you?',
-    buttonLabel: 'Choose day',
-    rows,
-  }
-}
-
-export function buildTimeList(
-  to: string,
-  doctorId: string,
-  dateYmd: string,
-  slots: Slot[],
-): OutboundList {
-  const rows: ListRow[] = slots.slice(0, MAX_LIST_ROWS).map((s) => ({
-    // s.hhmm is the compact clinic-local time carried on the slot, so no
-    // fragile re-parsing of the display label.
-    id: encodeSlotId(doctorId, dateYmd, s.hhmm),
-    title: s.localLabel.slice(0, 24),
-  }))
-  return {
-    kind: 'list',
-    to,
-    body: 'Please pick a time:',
-    buttonLabel: 'Choose time',
-    rows,
-  }
-}
 
 export function buildConfirmation(
   to: string,
@@ -89,14 +19,6 @@ export function buildConfirmation(
     kind: 'text',
     to,
     body: `Confirmed! Your appointment with ${doctorLabel} is booked for ${dayLabel} at ${timeLabel}. See you then.`,
-  }
-}
-
-export function buildSlotTaken(to: string): OutboundText {
-  return {
-    kind: 'text',
-    to,
-    body: 'Sorry, that time was just taken. Please pick another from the updated list.',
   }
 }
 
@@ -113,5 +35,50 @@ export function buildFallback(to: string): OutboundText {
     kind: 'text',
     to,
     body: 'To book an appointment, reply with "appointment".',
+  }
+}
+
+// ------------------------------------------------------------
+// Numbered-text builders for the wacrm channel.
+//
+// wacrm's inbound webhook doesn't forward the tapped interactive-row id,
+// so the flow is driven by numbered TEXT replies. These build a plain
+// numbered menu ('1. ...\n2. ...') and ask the patient to reply with a
+// number. The caller pairs each line with a FlowOption so the reply can
+// be matched back to an id.
+// ------------------------------------------------------------
+
+/** Render a numbered menu with a prompt line above it. */
+function numberedMenu(
+  to: string,
+  prompt: string,
+  labels: string[],
+): OutboundText {
+  const lines = labels.map((label, i) => `${i + 1}. ${label}`)
+  return {
+    kind: 'text',
+    to,
+    body: `${prompt}\n\n${lines.join('\n')}\n\nReply with a number.`,
+  }
+}
+
+export function buildDoctorMenu(to: string, labels: string[]): OutboundText {
+  return numberedMenu(to, 'Which doctor would you like to see?', labels)
+}
+
+export function buildDayMenu(to: string, labels: string[]): OutboundText {
+  return numberedMenu(to, 'Which day works for you?', labels)
+}
+
+export function buildTimeMenu(to: string, labels: string[]): OutboundText {
+  return numberedMenu(to, 'Please pick a time:', labels)
+}
+
+/** Shown when a typed reply doesn't match any offered option. */
+export function buildDidNotUnderstand(to: string): OutboundText {
+  return {
+    kind: 'text',
+    to,
+    body: 'Sorry, I didn\'t catch that. Please reply with the number of your choice.',
   }
 }

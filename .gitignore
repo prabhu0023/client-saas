@@ -29,3 +29,6 @@ next-env.d.ts
 
 # vitest
 /coverage
+
+# supabase CLI scratch state (linked project ref, versions) — not source
+/supabase/.temp

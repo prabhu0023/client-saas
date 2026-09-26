@@ -1,13 +1,13 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { generateSlots } from '@/lib/availability/slot-generation'
 import { localToUtc, localDayLabel } from '@/lib/availability/timezone'
-import type { DoctorOption, DayOption } from './messages'
+import type { DoctorOption, DayOption } from './types'
 
 /**
- * DB reads that back the WhatsApp flow. Kept separate from the pure
- * router (flow.ts) so the routing logic stays testable without a DB.
- * All reads use the service role (WhatsApp path has no logged-in user)
- * and are always scoped by clinic_id.
+ * DB reads that back the WhatsApp flow. Kept separate from the flow
+ * state machine (text-flow.ts) so the query logic stays isolated and
+ * testable. All reads use the service role (the WhatsApp path has no
+ * logged-in user) and are always scoped by clinic_id.
  */
 
 /** Active doctors for a clinic, as pickable options. */
@@ -37,6 +37,37 @@ export async function loadDoctorOptions(
     const label = rel.specialty ? `${name} (${rel.specialty})` : name
     return { id: rel.id, label }
   })
+}
+
+/**
+ * A single doctor's display label ('Dr. Rao (Cardiology)'), scoped to
+ * the clinic. Returns null if the doctor is not an active member of
+ * this clinic — which doubles as a tenancy check for forged ids.
+ */
+export async function loadDoctorLabel(
+  clinicId: string,
+  doctorId: string,
+): Promise<string | null> {
+  const db = supabaseAdmin()
+  const { data, error } = await db
+    .from('doctor_profiles')
+    .select('id, specialty, clinic_members!inner(status, users(full_name))')
+    .eq('clinic_id', clinicId)
+    .eq('id', doctorId)
+    .eq('clinic_members.status', 'active')
+    .maybeSingle()
+
+  if (error || !data) {
+    if (error) console.error('[wa/query] loadDoctorLabel failed:', error.message)
+    return null
+  }
+
+  const rel = data as unknown as {
+    specialty: string | null
+    clinic_members?: { users?: { full_name?: string | null } | null } | null
+  }
+  const name = rel.clinic_members?.users?.full_name ?? 'Doctor'
+  return rel.specialty ? `${name} (${rel.specialty})` : name
 }
 
 /** A doctor's default slot length (for slot generation). */

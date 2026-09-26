@@ -57,6 +57,13 @@ const CLINIC = {
 // Set this to the Meta phone_number_id of your demo WhatsApp number.
 const PHONE_NUMBER_ID = process.env.DEMO_PHONE_NUMBER_ID ?? 'demo-phone-number-id'
 
+// wacrm account id for this clinic (one wacrm account per clinic). This
+// is the `account_id` wacrm stamps on every inbound webhook; it routes
+// the inbound event to this clinic. Set DEMO_WACRM_ACCOUNT_ID to your
+// real wacrm account id so live inbound messages resolve to the demo clinic.
+const WACRM_ACCOUNT_ID =
+  process.env.DEMO_WACRM_ACCOUNT_ID ?? 'demo-wacrm-account-id'
+
 // Password set on every seeded doctor account so you can log in to the
 // staff portal. Override with DEMO_PASSWORD in .env.local. This is demo
 // data only — never use a shared/known password for real accounts.
@@ -191,6 +198,17 @@ async function main() {
     )
   if (wErr) throw new Error(`wa number: ${wErr.message}`)
   console.log(`  wa number ${PHONE_NUMBER_ID}`)
+
+  // 2b. wacrm account -> clinic mapping (tenant router for the wacrm
+  //     webhook). Upsert by wacrm_account_id so re-runs are idempotent.
+  const { error: waAcctErr } = await db
+    .from('clinic_wacrm_accounts')
+    .upsert(
+      { clinic_id: clinicId, wacrm_account_id: WACRM_ACCOUNT_ID, status: 'active' },
+      { onConflict: 'wacrm_account_id' },
+    )
+  if (waAcctErr) throw new Error(`wacrm account: ${waAcctErr.message}`)
+  console.log(`  wacrm account ${WACRM_ACCOUNT_ID}`)
 
   // 3. Services (upsert-ish: skip if a same-named one exists)
   for (const s of SERVICES) {
