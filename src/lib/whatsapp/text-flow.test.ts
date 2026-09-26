@@ -151,8 +151,8 @@ beforeEach(() => {
     patientId: 'pat-1',
   })
   loadUpcomingAppointmentsMock.mockResolvedValue([
-    { id: 'appt-A', label: 'Mon, Sep 28 at 9:00 AM (General)' },
-    { id: 'appt-B', label: 'Tue, Sep 29 at 10:00 AM (Pediatrics)' },
+    { id: 'appt-A', doctorId: 'doc-rao', label: 'Mon, Sep 28 at 9:00 AM (General)' },
+    { id: 'appt-B', doctorId: 'doc-iyer', label: 'Tue, Sep 29 at 10:00 AM (Pediatrics)' },
   ])
   cancelAppointmentMock.mockResolvedValue(true)
 })
@@ -304,6 +304,75 @@ describe('handleTextMessage — cancel flow', () => {
     cancelAppointmentMock.mockResolvedValue(false)
     await send('cancel')
     const r = await send('1')
+    expect(r?.body).toContain('no upcoming appointments')
+    expect(sessions.has(CONV)).toBe(false)
+  })
+})
+
+describe('handleTextMessage — reschedule flow', () => {
+  it('reschedule keyword lists upcoming appointments to move', async () => {
+    const r = await send('reschedule')
+    expect(r?.body).toContain('reschedule')
+    expect(r?.body).toContain('1. Mon, Sep 28 at 9:00 AM (General)')
+    expect(sessions.get(CONV)?.step).toBe('awaiting_reschedule')
+  })
+
+  it('"change my appointment" starts reschedule, not cancel or booking', async () => {
+    const r = await send('change my appointment')
+    expect(r?.body).toContain('reschedule')
+    expect(sessions.get(CONV)?.step).toBe('awaiting_reschedule')
+    expect(loadDoctorOptionsMock).not.toHaveBeenCalled()
+  })
+
+  it('full reschedule: pick appt → day → time → books new AND cancels old', async () => {
+    await send('reschedule') // → awaiting_reschedule (lists appts)
+    const rDay = await send('1') // pick appt-A (doc-rao) → day menu
+    expect(rDay?.body).toContain('Which day')
+    // carries the reschedule id + same doctor
+    expect(sessions.get(CONV)?.data.rescheduleId).toBe('appt-A')
+    expect(sessions.get(CONV)?.data.doctorId).toBe('doc-rao')
+
+    const rTime = await send('1') // pick day → time menu
+    expect(rTime?.body).toContain('pick a time')
+
+    const rDone = await send('1') // pick time → book new + cancel old
+    expect(bookAppointmentMock).toHaveBeenCalledTimes(1)
+    expect(cancelAppointmentMock).toHaveBeenCalledWith(CLINIC.id, PHONE, 'appt-A')
+    expect(rDone?.body).toContain('moved to')
+    expect(sessions.has(CONV)).toBe(false)
+  })
+
+  it('does NOT cancel the old appointment if the new slot is taken', async () => {
+    bookAppointmentMock.mockResolvedValue({ status: 'slot_taken' })
+
+    await send('reschedule')
+    await send('1') // pick appt-A → day
+    await send('1') // pick day → time
+    const r = await send('1') // attempt new booking → slot_taken
+
+    // Old appointment untouched; patient keeps their original booking.
+    expect(cancelAppointmentMock).not.toHaveBeenCalled()
+    // Re-offered the times, still rescheduling.
+    expect(r?.body).toContain('pick a time')
+    expect(sessions.get(CONV)?.data.rescheduleId).toBe('appt-A')
+  })
+
+  it('does NOT cancel the old appointment if the new booking errors', async () => {
+    bookAppointmentMock.mockResolvedValue({ status: 'error', message: 'db down' })
+
+    await send('reschedule')
+    await send('1')
+    await send('1')
+    const r = await send('1') // booking errors
+
+    expect(cancelAppointmentMock).not.toHaveBeenCalled()
+    expect(r?.body).toContain('reply with "appointment"') // fallback
+    expect(sessions.has(CONV)).toBe(false)
+  })
+
+  it('no upcoming appointments → nothing-to-reschedule message', async () => {
+    loadUpcomingAppointmentsMock.mockResolvedValue([])
+    const r = await send('reschedule')
     expect(r?.body).toContain('no upcoming appointments')
     expect(sessions.has(CONV)).toBe(false)
   })

@@ -65,7 +65,7 @@ Create **two** Supabase projects (keep schemas isolated).
 
 ### 1b. clinic-saas database
 1. New Supabase project → note URL + anon + service-role keys.
-2. Apply clinic-saas migrations **in order**, `001` → `008` (all in
+2. Apply clinic-saas migrations **in order**, `001` → `009` (all in
    `supabase/migrations/`): `001` schema, `002` btree_gist exclusion, `003` RLS,
    `004` `book_appointment` RPC, `005` `processed_wa_events`, `006`
    `clinic_wacrm_accounts` + `wa_sessions`, `007` `reminder_sent_at`. The
@@ -94,6 +94,7 @@ a new environment or to reproduce a clean state. Two paths — pick one.
 | 006 | `006_wacrm_sessions.sql` | `clinic_wacrm_accounts` + `wa_sessions` | 001 (`set_updated_at`, `clinics`) |
 | 007 | `007_appointment_reminders.sql` | `appointments.reminder_sent_at` + due-scan index | 001 (`appointments`) |
 | 008 | `008_wa_session_cancel_step.sql` | widen `wa_sessions.step` CHECK for `awaiting_cancel` | 006 (`wa_sessions`) |
+| 009 | `009_wa_session_reschedule_step.sql` | widen `wa_sessions.step` CHECK for `awaiting_reschedule` | 006 (`wa_sessions`) |
 
 ### Option A — Local stack (throwaway, non-destructive)
 
@@ -126,7 +127,7 @@ migrations the remote hasn't seen yet.
 
 ```bash
 supabase link --project-ref <your-project-ref>   # once
-supabase db push                                  # applies 001..008 in order
+supabase db push                                  # applies 001..009 in order
 npm run seed                                      # against the remote (uses .env.local keys)
 ```
 
@@ -136,7 +137,7 @@ npm run seed                                      # against the remote (uses .en
 
 ### Expected result (both paths)
 
-- All 8 migrations apply with no errors (idempotent — safe to re-run).
+- All 9 migrations apply with no errors (idempotent — safe to re-run).
 - `npm run seed` creates: Demo Clinic (Asia/Kolkata), a WhatsApp number, a
   `clinic_wacrm_accounts` mapping, 2 services, 2 doctors with Mon–Fri
   availability, and a few demo appointments for today. It prints staff logins.
@@ -245,7 +246,7 @@ reminder window and sends the approved WhatsApp template for each.
 
 - [ ] Push both repos to GitHub (clinic-saas private)
 - [ ] Supabase project A (wacrm) — create, apply migrations
-- [ ] Supabase project B (clinic-saas) — create, apply migrations 001–008
+- [ ] Supabase project B (clinic-saas) — create, apply migrations 001–009
 - [ ] Seed clinic-saas DB (clinic, doctors, availability, wacrm-account mapping)
 - [ ] Deploy wacrm to Vercel + env vars → get URL
 - [ ] Deploy clinic-saas to Vercel + env vars (incl. wacrm URL) → get URL

@@ -82,6 +82,31 @@ export function buildCancelMenu(to: string, labels: string[]): OutboundText {
   )
 }
 
+export function buildReschedulePickMenu(
+  to: string,
+  labels: string[],
+): OutboundText {
+  return numberedMenu(
+    to,
+    'Which appointment would you like to reschedule?',
+    labels,
+  )
+}
+
+/** Confirmation after a successful reschedule (new slot booked, old cancelled). */
+export function buildRescheduled(
+  to: string,
+  doctorLabel: string,
+  dayLabel: string,
+  timeLabel: string,
+): OutboundText {
+  return {
+    kind: 'text',
+    to,
+    body: `Done! Your appointment has been moved to ${dayLabel} at ${timeLabel} with ${doctorLabel}. See you then.`,
+  }
+}
+
 /** Shown when the patient has no upcoming appointments to cancel. */
 export function buildNoAppointments(to: string): OutboundText {
   return {

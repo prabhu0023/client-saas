@@ -21,8 +21,14 @@ import {
   buildCancelMenu,
   buildNoAppointments,
   buildCancelled,
+  buildReschedulePickMenu,
+  buildRescheduled,
 } from './messages'
-import { matchesBookingKeyword, matchesCancelKeyword } from './keywords'
+import {
+  matchesBookingKeyword,
+  matchesCancelKeyword,
+  matchesRescheduleKeyword,
+} from './keywords'
 import {
   loadSession,
   saveSession,
@@ -80,11 +86,12 @@ export async function handleTextMessage(
   const to = input.waPhone
   const existing = await loadSession(input.conversationId)
 
-  // No live session: a cancel keyword starts the cancel flow, a booking
-  // keyword starts booking; anything else gets the fallback nudge.
-  // Cancel is checked first because "cancel my appointment" also contains
-  // a booking keyword ("appointment").
+  // No live session: route by intent keyword. Order matters — reschedule
+  // and cancel are checked before booking because "reschedule/cancel my
+  // appointment" also contains the booking keyword "appointment".
   if (!existing || existing.step === 'idle') {
+    if (matchesRescheduleKeyword(input.text))
+      return startRescheduleStep(clinic, input, to)
     if (matchesCancelKeyword(input.text)) return startCancelStep(clinic, input, to)
     if (!matchesBookingKeyword(input.text)) return buildFallback(to)
     return startDoctorStep(clinic, input, to)
@@ -97,6 +104,8 @@ export async function handleTextMessage(
       return handleDayReply(clinic, existing, input, to)
     case 'awaiting_cancel':
       return handleCancelReply(clinic, existing, input, to)
+    case 'awaiting_reschedule':
+      return handleReschedulePickReply(clinic, existing, input, to)
     case 'awaiting_time':
       return handleTimeReply(clinic, existing, input, to)
     default:
@@ -154,6 +163,7 @@ async function enterDayStep(
   input: TextFlowInput,
   to: string,
   doctorId: string,
+  rescheduleId?: string,
 ): Promise<OutboundMessage> {
   // Tenancy: confirm the doctor is an active member of this clinic.
   if (!(await loadDoctorLabel(clinic.id, doctorId))) return buildFallback(to)
@@ -171,7 +181,7 @@ async function enterDayStep(
     clinicId: clinic.id,
     waPhone: input.waPhone,
     step: 'awaiting_day',
-    data: { doctorId, options },
+    data: { doctorId, rescheduleId, options },
   })
   return buildDayMenu(to, options.map((o) => o.label))
 }
@@ -188,7 +198,14 @@ async function handleDayReply(
   const picked = matchOption(input.text, session.data.options ?? [])
   if (!picked) return buildDidNotUnderstand(to)
 
-  return enterTimeStep(clinic, input, to, doctorId, picked.id)
+  return enterTimeStep(
+    clinic,
+    input,
+    to,
+    doctorId,
+    picked.id,
+    session.data.rescheduleId,
+  )
 }
 
 // ------------------------------------------------------------
@@ -200,6 +217,7 @@ async function enterTimeStep(
   to: string,
   doctorId: string,
   dateYmd: string,
+  rescheduleId?: string,
 ): Promise<OutboundMessage> {
   const slotMinutes = await loadDoctorSlotMinutes(doctorId)
   if (!slotMinutes) return buildNoAvailability(to)
@@ -222,7 +240,7 @@ async function enterTimeStep(
     clinicId: clinic.id,
     waPhone: input.waPhone,
     step: 'awaiting_time',
-    data: { doctorId, dateYmd, options },
+    data: { doctorId, dateYmd, rescheduleId, options },
   })
   return buildTimeMenu(to, options.map((o) => o.label))
 }
@@ -260,19 +278,35 @@ async function handleTimeReply(
     createdVia: 'whatsapp',
   })
 
+  const rescheduleId = session.data.rescheduleId
+
   if (result.status === 'booked') {
-    await clearSession(input.conversationId)
     const dayLabel = localDayLabel(startsAt, clinic.timezone)
     const timeLabel = localTimeLabel(startsAt, clinic.timezone)
+
+    // Reschedule: the NEW slot is now booked, so it's safe to release the
+    // OLD one. Ordering matters — book-new-then-cancel-old means there's
+    // never a moment with zero appointments, and the DB exclusion
+    // constraint already prevented a double-book above.
+    if (rescheduleId) {
+      await cancelAppointment(clinic.id, input.waPhone, rescheduleId)
+      await clearSession(input.conversationId)
+      return buildRescheduled(to, doctorLabel, dayLabel, timeLabel)
+    }
+
+    await clearSession(input.conversationId)
     return buildConfirmation(to, doctorLabel, dayLabel, timeLabel)
   }
 
   if (result.status === 'slot_taken') {
-    // Re-offer the day's remaining times (stay in awaiting_time).
-    return enterTimeStep(clinic, input, to, doctorId, dateYmd)
+    // Re-offer the day's remaining times (stay in awaiting_time). The old
+    // appointment is untouched, so a reschedule that hits a taken slot
+    // safely leaves the patient with their original booking intact.
+    return enterTimeStep(clinic, input, to, doctorId, dateYmd, rescheduleId)
   }
 
-  // invalid / error: reset so the patient can start over.
+  // invalid / error: reset so the patient can start over. For a
+  // reschedule this also leaves the original appointment untouched.
   await clearSession(input.conversationId)
   return buildFallback(to)
 }
@@ -325,6 +359,59 @@ async function handleCancelReply(
   // gone/changed (e.g. staff cancelled it first), fall back gracefully.
   if (ok) return buildCancelled(to, picked.label)
   return buildNoAppointments(to)
+}
+
+// ------------------------------------------------------------
+// Reschedule flow: pick an upcoming appointment to move, then run the
+// normal day → time → book steps for the SAME doctor. On a successful
+// new booking, the old appointment is cancelled (see handleTimeReply).
+// Entered by a 'reschedule' keyword from an idle conversation.
+// ------------------------------------------------------------
+async function startRescheduleStep(
+  clinic: ClinicRow,
+  input: TextFlowInput,
+  to: string,
+): Promise<OutboundMessage> {
+  const appts = await loadUpcomingAppointments(
+    clinic.id,
+    input.waPhone,
+    clinic.timezone,
+  )
+  if (appts.length === 0) return buildNoAppointments(to)
+
+  // Carry the doctor id on each option (encoded as `${apptId}|${doctorId}`)
+  // so the pick handler can re-enter the day step for the same doctor
+  // without a second lookup.
+  const options: FlowOption[] = appts.map((a, i) => ({
+    n: i + 1,
+    id: `${a.id}|${a.doctorId}`,
+    label: a.label,
+  }))
+  await saveSession({
+    conversationId: input.conversationId,
+    clinicId: clinic.id,
+    waPhone: input.waPhone,
+    step: 'awaiting_reschedule',
+    data: { options },
+  })
+  return buildReschedulePickMenu(to, options.map((o) => o.label))
+}
+
+async function handleReschedulePickReply(
+  clinic: ClinicRow,
+  session: WaSession,
+  input: TextFlowInput,
+  to: string,
+): Promise<OutboundMessage> {
+  const picked = matchOption(input.text, session.data.options ?? [])
+  if (!picked) return buildDidNotUnderstand(to)
+
+  const [rescheduleId, doctorId] = picked.id.split('|')
+  if (!rescheduleId || !doctorId) return buildFallback(to)
+
+  // Re-enter the day step for the same doctor, carrying the id of the
+  // appointment being moved so the final booking step cancels it.
+  return enterDayStep(clinic, input, to, doctorId, rescheduleId)
 }
 
 async function loadClinic(clinicId: string): Promise<ClinicRow | null> {

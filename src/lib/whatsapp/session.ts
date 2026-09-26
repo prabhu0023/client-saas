@@ -14,6 +14,7 @@ export type FlowStep =
   | 'awaiting_day'
   | 'awaiting_time'
   | 'awaiting_cancel'
+  | 'awaiting_reschedule'
 
 /** One numbered option we presented, so a typed reply can be matched. */
 export interface FlowOption {
@@ -28,6 +29,13 @@ export interface FlowOption {
 export interface FlowData {
   doctorId?: string
   dateYmd?: string
+  /**
+   * When set, the flow is RESCHEDULING this existing appointment: the
+   * day/time steps run as normal, but on a successful new booking we
+   * cancel this old appointment (book-new-then-cancel-old, so there's
+   * never a window with zero appointments).
+   */
+  rescheduleId?: string
   /** The options presented in the message that put us in `step`. */
   options?: FlowOption[]
 }

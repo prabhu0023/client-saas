@@ -78,10 +78,16 @@ export interface DayOption {
   label: string
 }
 
-/** An upcoming appointment the patient can cancel, as a pickable option. */
+/**
+ * An upcoming appointment the patient can act on (cancel or reschedule),
+ * as a pickable option. `doctorId` lets the reschedule flow re-enter the
+ * day step for the same doctor.
+ */
 export interface CancelOption {
   /** Appointment id. */
   id: string
+  /** The appointment's doctor (doctor_profiles.id). */
+  doctorId: string
   /** Human label, e.g. 'Mon, Sep 28 at 9:00 AM (General)'. */
   label: string
 }

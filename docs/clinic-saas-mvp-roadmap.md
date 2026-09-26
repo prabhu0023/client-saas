@@ -216,7 +216,7 @@ changes reach the patient. Completes the "real appointment" story.
   cancellable statuses.
 - **Deps:** E1 complete.
 
-### E4-T2 — Patient reschedule over WhatsApp
+### E4-T2 — Patient reschedule over WhatsApp ✅ DONE
 - **Scope:** reschedule = cancel + rebook in one flow (pick new day → time for the
   same doctor). Atomic where practical; if the new slot is taken mid-flow, keep
   the original and re-offer.

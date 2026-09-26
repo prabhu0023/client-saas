@@ -163,7 +163,7 @@ export async function loadUpcomingAppointments(
 
   const { data, error } = await db
     .from('appointments')
-    .select('id, starts_at, doctor_profiles ( specialty )')
+    .select('id, starts_at, doctor_id, doctor_profiles ( specialty )')
     .eq('clinic_id', clinicId)
     .eq('patient_id', (patient as { id: string }).id)
     .in('status', ['booked', 'confirmed'])
@@ -179,6 +179,7 @@ export async function loadUpcomingAppointments(
   type Row = {
     id: string
     starts_at: string
+    doctor_id: string
     doctor_profiles: { specialty: string | null } | null
   }
 
@@ -190,7 +191,7 @@ export async function loadUpcomingAppointments(
     const label = specialty
       ? `${day} at ${time} (${specialty})`
       : `${day} at ${time}`
-    return { id: r.id, label }
+    return { id: r.id, doctorId: r.doctor_id, label }
   })
 }
 
