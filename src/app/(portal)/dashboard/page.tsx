@@ -3,6 +3,7 @@ import {
   getAppointmentsForDay,
   type DashboardAppointment,
 } from '@/lib/portal/appointments'
+import { getDoctorNameMap } from '@/lib/portal/doctors'
 import { todayYmdInTimeZone, localDayLabel } from '@/lib/availability/timezone'
 import type { AppointmentStatus } from '@/types'
 import { updateAppointmentStatus } from './actions'
@@ -39,11 +40,14 @@ export default async function DashboardPage({
   const dateYmd =
     date && YMD.test(date) ? date : todayYmdInTimeZone(clinic.timezone)
 
-  const appointments = await getAppointmentsForDay({
-    clinicId: clinic.id,
-    dateYmd,
-    timezone: clinic.timezone,
-  })
+  const [appointments, doctorNames] = await Promise.all([
+    getAppointmentsForDay({
+      clinicId: clinic.id,
+      dateYmd,
+      timezone: clinic.timezone,
+    }),
+    getDoctorNameMap(clinic.id),
+  ])
 
   // A representative label for the day header, rendered in clinic tz.
   const dayLabel = localDayLabel(new Date(`${dateYmd}T12:00:00Z`), 'UTC')
@@ -70,7 +74,12 @@ export default async function DashboardPage({
       ) : (
         <div className={styles.list}>
           {appointments.map((appt) => (
-            <AppointmentRow key={appt.id} appt={appt} dateYmd={dateYmd} />
+            <AppointmentRow
+              key={appt.id}
+              appt={appt}
+              dateYmd={dateYmd}
+              doctorLabel={resolveDoctorLabel(appt, doctorNames)}
+            />
           ))}
         </div>
       )}
@@ -78,12 +87,29 @@ export default async function DashboardPage({
   )
 }
 
+/**
+ * Doctor label for a row: prefer the name (via the SECURITY DEFINER RPC),
+ * append specialty when both are known, and fall back to specialty alone
+ * (or nothing) when the name isn't available.
+ */
+function resolveDoctorLabel(
+  appt: DashboardAppointment,
+  names: Map<string, string>,
+): string | null {
+  const name = names.get(appt.doctorId)
+  if (name && appt.doctorSpecialty) return `${name} · ${appt.doctorSpecialty}`
+  if (name) return name
+  return appt.doctorSpecialty
+}
+
 function AppointmentRow({
   appt,
   dateYmd,
+  doctorLabel,
 }: {
   appt: DashboardAppointment
   dateYmd: string
+  doctorLabel: string | null
 }) {
   const actions = NEXT_ACTIONS[appt.status]
 
@@ -100,7 +126,7 @@ function AppointmentRow({
         <div className={styles.meta}>
           {appt.patientName ? `${appt.patientPhone} · ` : ''}
           {appt.serviceName ?? 'No service'}
-          {appt.doctorSpecialty ? ` · ${appt.doctorSpecialty}` : ''}
+          {doctorLabel ? ` · ${doctorLabel}` : ''}
           {` · via ${appt.createdVia}`}
         </div>
       </div>

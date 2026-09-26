@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getDoctorNameMap } from './doctors'
 import type { AvailabilityRule, AvailabilityException } from '@/types'
 
 /**
@@ -27,23 +28,32 @@ export interface DoctorRef {
   label: string
 }
 
-/** Active doctors in the clinic, as pickable refs (specialty-labelled). */
+/**
+ * Active doctors in the clinic, as pickable refs. Labelled by name (via
+ * the clinic_doctor_names RPC — E6-T1) with specialty appended when both
+ * are known; falls back to specialty, then a short id.
+ */
 export async function listClinicDoctors(clinicId: string): Promise<DoctorRef[]> {
   const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('doctor_profiles')
-    .select('id, specialty, clinic_members!inner(status)')
-    .eq('clinic_id', clinicId)
-    .eq('clinic_members.status', 'active')
+  const [{ data, error }, names] = await Promise.all([
+    supabase
+      .from('doctor_profiles')
+      .select('id, specialty, clinic_members!inner(status)')
+      .eq('clinic_id', clinicId)
+      .eq('clinic_members.status', 'active'),
+    getDoctorNameMap(clinicId),
+  ])
 
   if (error) throw new Error(`doctors fetch: ${error.message}`)
 
   return (data ?? []).map((row) => {
     const r = row as unknown as { id: string; specialty: string | null }
-    return {
-      id: r.id,
-      label: r.specialty ?? `Doctor ${r.id.slice(0, 8)}`,
-    }
+    const name = names.get(r.id)
+    let label: string
+    if (name && r.specialty) label = `${name} (${r.specialty})`
+    else if (name) label = name
+    else label = r.specialty ?? `Doctor ${r.id.slice(0, 8)}`
+    return { id: r.id, label }
   })
 }
 

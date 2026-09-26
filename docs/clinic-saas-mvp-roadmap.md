@@ -257,7 +257,7 @@ changes reach the patient. Completes the "real appointment" story.
 
 **Goal:** the staff portal reads as a finished product for the demo.
 
-### E6-T1 — Show doctor names (RLS view/RPC)
+### E6-T1 — Show doctor names (RLS view/RPC) ✅ DONE
 - **Scope:** doctor names aren't shown today because `users` is RLS-self-only
   (noted in `portal/appointments.ts`). Add a `SECURITY DEFINER` view/RPC exposing
   member display names within the caller's clinic only.
