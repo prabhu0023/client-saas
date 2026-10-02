@@ -23,7 +23,9 @@ import {
   buildCancelled,
   buildReschedulePickMenu,
   buildRescheduled,
+  buildMessageAck,
 } from './messages'
+import { capturePatientMessage } from './messaging'
 import {
   matchesBookingKeyword,
   matchesCancelKeyword,
@@ -70,6 +72,8 @@ export interface TextFlowInput {
   waPhone: string
   /** The inbound free text. */
   text: string
+  /** wacrm delivery id, stored with a captured message for tracing. */
+  waMessageId?: string
 }
 
 interface ClinicRow {
@@ -93,7 +97,7 @@ export async function handleTextMessage(
     if (matchesRescheduleKeyword(input.text))
       return startRescheduleStep(clinic, input, to)
     if (matchesCancelKeyword(input.text)) return startCancelStep(clinic, input, to)
-    if (!matchesBookingKeyword(input.text)) return buildFallback(to)
+    if (!matchesBookingKeyword(input.text)) return captureMessage(clinic, input, to)
     return startDoctorStep(clinic, input, to)
   }
 
@@ -111,6 +115,32 @@ export async function handleTextMessage(
     default:
       return buildFallback(to)
   }
+}
+
+// ------------------------------------------------------------
+// Non-booking message: a post-visit doubt rather than booking intent.
+//
+// This branch used to just nudge ("reply with appointment"), which lost
+// the message. Now it persists it into the patient's thread for staff to
+// answer (R1) and acknowledges receipt (R3). No session is created — the
+// patient is not in a flow, and the next message is judged on its own.
+//
+// If the write fails we fall back to the old nudge: never acknowledge
+// receipt of something we didn't actually store.
+// ------------------------------------------------------------
+async function captureMessage(
+  clinic: ClinicRow,
+  input: TextFlowInput,
+  to: string,
+): Promise<OutboundMessage> {
+  const result = await capturePatientMessage({
+    clinicId: clinic.id,
+    waPhone: input.waPhone,
+    body: input.text,
+    waMessageId: input.waMessageId,
+  })
+  if (!result) return buildFallback(to)
+  return buildMessageAck(to, result.isFirstMessage)
 }
 
 // ------------------------------------------------------------

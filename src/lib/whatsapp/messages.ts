@@ -38,6 +38,30 @@ export function buildFallback(to: string): OutboundText {
   }
 }
 
+/**
+ * Receipt for a captured non-booking message (R3). Deliberately neutral:
+ * a human reads and replies, so this NEVER answers the question or
+ * offers any clinical guidance (spec §1 non-goals, §2 hard constraints).
+ *
+ * On the patient's first ever message it also carries the one-time
+ * notice that messages are logged and visible to the clinic (spec §2
+ * consent). Either way it is exactly ONE outbound message.
+ */
+export function buildMessageAck(
+  to: string,
+  isFirstMessage: boolean,
+): OutboundText {
+  const ack =
+    'Thanks — the clinic has received your message and will reply soon.'
+  const notice =
+    'Please note: messages in this chat are saved to your clinic record and can be seen by the clinic staff and your doctor.'
+  return {
+    kind: 'text',
+    to,
+    body: isFirstMessage ? `${ack}\n\n${notice}` : ack,
+  }
+}
+
 // ------------------------------------------------------------
 // Numbered-text builders for the wacrm channel.
 //

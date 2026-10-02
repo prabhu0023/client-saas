@@ -92,6 +92,9 @@ async function handleDelivery(env: WacrmEnvelope): Promise<string> {
       conversationId,
       waPhone,
       text,
+      // Traceability for a captured message: prefer the WhatsApp message
+      // id, fall back to the wacrm delivery id.
+      waMessageId: env.data.whatsappMessageId ?? env.id,
     })
     if (reply) await sendMessage(reply)
     return 'handled'

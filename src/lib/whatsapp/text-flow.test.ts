@@ -77,6 +77,14 @@ vi.mock('@/lib/booking/book', () => ({
 }))
 
 // ------------------------------------------------------------
+// Patient-message capture (the non-booking branch).
+// ------------------------------------------------------------
+const capturePatientMessageMock = vi.fn()
+vi.mock('./messaging', () => ({
+  capturePatientMessage: (...a: unknown[]) => capturePatientMessageMock(...a),
+}))
+
+// ------------------------------------------------------------
 // loadClinic() reads clinics via supabaseAdmin(); return a fixed clinic.
 // ------------------------------------------------------------
 const CLINIC = { id: 'clinic-1', timezone: 'Asia/Kolkata' }
@@ -155,6 +163,9 @@ beforeEach(() => {
     { id: 'appt-B', doctorId: 'doc-iyer', label: 'Tue, Sep 29 at 10:00 AM (Pediatrics)' },
   ])
   cancelAppointmentMock.mockResolvedValue(true)
+  // Default to a FAILED capture so the booking-flow tests below exercise
+  // the unchanged fallback behaviour; the capture tests opt in explicitly.
+  capturePatientMessageMock.mockResolvedValue(null)
 })
 
 describe('handleTextMessage — full booking flow', () => {
@@ -252,6 +263,81 @@ describe('handleTextMessage — non-happy paths', () => {
     await send('appointment') // doctor menu
     const r2 = await send('1') // pick doctor → tries days
     expect(r2?.body).toContain('no open slots')
+  })
+})
+
+describe('handleTextMessage — message capture', () => {
+  const CAPTURED = {
+    patientId: 'pat-1',
+    messageId: 'msg-1',
+    isFirstMessage: false,
+  }
+
+  it('free text with no session is captured once and acknowledged', async () => {
+    capturePatientMessageMock.mockResolvedValue(CAPTURED)
+
+    const r = await send('I have a doubt about the medicine')
+
+    expect(capturePatientMessageMock).toHaveBeenCalledTimes(1)
+    expect(capturePatientMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clinicId: CLINIC.id,
+        waPhone: PHONE,
+        body: 'I have a doubt about the medicine',
+      }),
+    )
+    expect(r?.body).toContain('received your message')
+    // Not a flow: no session is created, and nothing was booked.
+    expect(sessions.has(CONV)).toBe(false)
+    expect(bookAppointmentMock).not.toHaveBeenCalled()
+  })
+
+  it('adds the logging notice only on the first ever message', async () => {
+    capturePatientMessageMock.mockResolvedValue({
+      ...CAPTURED,
+      isFirstMessage: true,
+    })
+    const first = await send('is the swelling normal?')
+    expect(first?.body).toContain('seen by the clinic staff')
+
+    capturePatientMessageMock.mockResolvedValue(CAPTURED)
+    const later = await send('still a bit sore')
+    expect(later?.body).not.toContain('seen by the clinic staff')
+  })
+
+  it('"appointment" still starts the booking flow and captures nothing', async () => {
+    const r = await send('appointment')
+    expect(r?.body).toContain('Which doctor')
+    expect(sessions.get(CONV)?.step).toBe('awaiting_doctor')
+    expect(capturePatientMessageMock).not.toHaveBeenCalled()
+  })
+
+  it('a live booking session takes free text as a step reply, not a message', async () => {
+    await send('appointment') // → awaiting_doctor
+    await send('1') // → awaiting_day
+    await send('1') // → awaiting_time
+    const r = await send('1') // books, rather than capturing '1'
+
+    expect(capturePatientMessageMock).not.toHaveBeenCalled()
+    expect(bookAppointmentMock).toHaveBeenCalledTimes(1)
+    expect(r?.body).toContain('Confirmed!')
+  })
+
+  it('a failed capture falls back to the nudge (never a false receipt)', async () => {
+    capturePatientMessageMock.mockResolvedValue(null)
+    const r = await send('I have a doubt about the medicine')
+
+    expect(capturePatientMessageMock).toHaveBeenCalledTimes(1)
+    expect(r?.body).toContain('reply with "appointment"')
+    expect(r?.body).not.toContain('received your message')
+  })
+
+  it('passes the wacrm delivery id through to the capture', async () => {
+    capturePatientMessageMock.mockResolvedValue(CAPTURED)
+    await handleTextMessage({ ...input('any doubt?'), waMessageId: 'wamid-9' })
+    expect(capturePatientMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({ waMessageId: 'wamid-9' }),
+    )
   })
 })
 

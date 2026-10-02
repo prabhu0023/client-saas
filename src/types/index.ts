@@ -14,6 +14,8 @@ export type AppointmentStatus =
   | 'completed'
   | 'no_show'
 export type CreatedVia = 'whatsapp' | 'portal'
+export type MessageDirection = 'inbound' | 'outbound'
+export type ThreadStatus = 'open' | 'escalated' | 'closed'
 
 export interface Clinic {
   id: string
@@ -134,6 +136,36 @@ export interface Appointment {
   reminder_sent_at: string | null
   created_at: string
   updated_at: string
+}
+
+// ------------------------------------------------------------
+// Patient messaging — mirror supabase/migrations/011.
+// ------------------------------------------------------------
+
+export interface PatientMessage {
+  id: string
+  clinic_id: string
+  patient_id: string
+  direction: MessageDirection
+  body: string
+  /** Inbound: the wacrm delivery id. NULL for outbound/system rows. */
+  wa_delivery_id: string | null
+  /** Outbound: the staff user who replied. NULL for inbound/system. */
+  sent_by: string | null
+  created_at: string
+}
+
+export interface PatientThread {
+  id: string
+  clinic_id: string
+  /** One thread per patient per clinic. */
+  patient_id: string
+  status: ThreadStatus
+  /** doctor_profiles.id the thread was handed to, if escalated. */
+  escalated_to_doctor_id: string | null
+  last_message_at: string | null
+  unread_count: number
+  created_at: string
 }
 
 // ------------------------------------------------------------

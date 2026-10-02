@@ -177,6 +177,7 @@ describe('POST /api/whatsapp/inbound — routing & acks', () => {
       conversationId: 'conv-1',
       waPhone: '+919876543210',
       text: 'appointment',
+      waMessageId: 'wamid-1',
     })
     expect(sendMessageMock).toHaveBeenCalledTimes(1)
   })
