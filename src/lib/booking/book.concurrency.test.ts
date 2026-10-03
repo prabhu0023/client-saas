@@ -112,6 +112,71 @@ describe.skipIf(!ENABLED)('book_appointment — concurrency (real DB)', () => {
     })
     expect(rowOutcome(overlap.data)).toBe('slot_taken')
   })
+
+  /**
+   * Staff booking contention (staff-create-appointment R4). The portal
+   * writes through the same RPC with p_created_via 'portal', so there is
+   * no second write path to arbitrate between — the exclusion constraint
+   * is still the only no-double-booking guard. These two cases are the
+   * only place that claim is actually exercised against a database.
+   */
+  it('portal and whatsapp racing for one slot → exactly one wins', async () => {
+    const startsAt = '2099-01-07T09:00:00.000Z'
+    const endsAt = '2099-01-07T09:30:00.000Z'
+
+    const attempt = (phone: string, via: 'portal' | 'whatsapp') =>
+      db.rpc('book_appointment', {
+        p_clinic_id: fx.clinicId,
+        p_doctor_id: fx.doctorId,
+        p_wa_phone: phone,
+        p_starts_at: startsAt,
+        p_ends_at: endsAt,
+        p_service_id: null,
+        p_patient_name: null,
+        p_created_via: via,
+      })
+
+    const [portal, whatsapp] = await Promise.all([
+      attempt('+919000000020', 'portal'),
+      attempt('+919000000021', 'whatsapp'),
+    ])
+
+    expect(portal.error).toBeNull()
+    expect(whatsapp.error).toBeNull()
+
+    const outcomes = [
+      rowOutcome(portal.data),
+      rowOutcome(whatsapp.data),
+    ].sort()
+    expect(outcomes).toEqual(['booked', 'slot_taken'])
+  })
+
+  it("a staff booking persists with created_via 'portal'", async () => {
+    const booked = await db.rpc('book_appointment', {
+      p_clinic_id: fx.clinicId,
+      p_doctor_id: fx.doctorId,
+      p_wa_phone: '+919000000022',
+      p_starts_at: '2099-01-08T11:00:00.000Z',
+      p_ends_at: '2099-01-08T11:30:00.000Z',
+      p_service_id: null,
+      p_patient_name: 'Portal Patient',
+      p_created_via: 'portal',
+    })
+    expect(rowOutcome(booked.data)).toBe('booked')
+
+    const row = (Array.isArray(booked.data) ? booked.data[0] : booked.data) as {
+      appointment_id: string
+    }
+
+    const { data: appt, error } = await db
+      .from('appointments')
+      .select('created_via')
+      .eq('id', row.appointment_id)
+      .single()
+
+    expect(error).toBeNull()
+    expect(appt?.created_via).toBe('portal')
+  })
 })
 
 // ------------------------------------------------------------

@@ -206,6 +206,35 @@
   background: #f3f4f6;
 }
 
+/* --- staff booking entry point (T4) --- */
+
+/*
+ * The one filled control in the header: creating an appointment is the
+ * action staff come to the dashboard to take, while the day nav and view
+ * toggle are navigation. Solid #1d4ed8 on white is the same 4.6:1 blue
+ * used for the primary button in inbox.module.css.
+ */
+.primaryAction {
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  text-decoration: none;
+  background: #1d4ed8;
+  border: 1px solid #1d4ed8;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.primaryAction:hover {
+  background: #1e40af;
+}
+
+.primaryAction:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
 /* --- kanban board --- */
 
 .board {
