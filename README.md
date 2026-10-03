@@ -69,6 +69,29 @@ RLS policies are otherwise only covered by a TypeScript stand-in:
 2. `src/lib/messaging/tenancy.db.test.ts` passes against a throwaway stack with
    that migration applied (the block above), on any machine with Docker.
 
+### Staff-created appointments
+
+Walk-ins and phone bookings no longer need the patient to open WhatsApp. Staff
+book from `/appointments/new` (the **New appointment** button on the dashboard):
+find the patient by name or phone — or add them inline — then pick a doctor, a
+day and a time.
+
+The offered times come from the **same** `generateSlots` the WhatsApp flow uses,
+with the same inputs, so staff and patients never see different availability for
+one doctor and day. Only real open slots are bookable: a submitted time is
+re-checked against a freshly generated list before anything is written, so there
+is no force-booking outside availability.
+
+Writes go through the existing `book_appointment` RPC with
+`created_via='portal'`, which keeps the `btree_gist` exclusion constraint as the
+single no-double-booking guard — the loser of a race is told to pick again
+instead of double-booking.
+
+**No migration is required.** Every table, column, index and RLS policy this
+needs already exists: `patients` with its `UNIQUE (clinic_id, wa_phone)`, the
+`patients_access` policy from `003_rls_policies.sql`, and the
+`appointments.created_via` check that already allows `'portal'`.
+
 ## Scripts
 
 - `npm run dev` — dev server

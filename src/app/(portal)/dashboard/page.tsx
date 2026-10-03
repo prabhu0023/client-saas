@@ -92,6 +92,15 @@ export default async function DashboardPage({
         </div>
 
         <div className={styles.nav}>
+          {/* Carries the day being viewed into the booking flow, so
+              staff land on the slots for the day they were looking at. */}
+          <Link
+            className={styles.primaryAction}
+            href={`/appointments/new?date=${dateYmd}`}
+          >
+            New appointment
+          </Link>
+
           <div className={styles.viewToggle}>
             <Link
               className={`${styles.viewBtn} ${viewMode === 'board' ? styles.viewActive : ''}`}
