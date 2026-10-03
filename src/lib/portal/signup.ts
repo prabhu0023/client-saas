@@ -33,6 +33,23 @@ export function signupMode(): SignupMode {
   return 'disabled'
 }
 
+let warnedDisabled = false
+
+/**
+ * Log the disabled-signup warning once per process (§12.2).
+ *
+ * The flag lives here rather than in /signup's page module for two
+ * reasons: a crawler hitting a misconfigured deployment would otherwise
+ * fill the log with the same line on every render, and mutating
+ * module state during a render is exactly what react-hooks/globals
+ * refuses — so the mutation belongs behind a function the page calls.
+ */
+export function warnSignupDisabled(): void {
+  if (warnedDisabled) return
+  warnedDisabled = true
+  console.warn('[signup] disabled (no ONBOARDING_SIGNUP_CODE)')
+}
+
 /**
  * Constant-time comparison of a submitted code against the configured one.
  *

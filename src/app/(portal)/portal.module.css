@@ -53,6 +53,23 @@
   background: #f3f4f6;
 }
 
+/* "Finish setup", shown to admins only while the checklist is open — it
+   is a prompt, so it reads differently from the steady navigation. */
+.navLinkAlert {
+  padding: 6px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #92400e;
+  text-decoration: none;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+}
+
+.navLinkAlert:hover {
+  background: #fef3c7;
+}
+
 .right {
   display: flex;
   align-items: center;

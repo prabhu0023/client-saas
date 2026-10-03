@@ -39,13 +39,20 @@ const ACTION_LABEL: Record<AppointmentStatus, string> = {
 
 type ViewMode = 'board' | 'agenda'
 
+// Where requireAdmin() sends a non-admin. Without this the redirect is
+// silent and reads as a broken link (§11.2); mirrors login/page.tsx.
+const ERRORS: Record<string, string> = {
+  'admin-only': 'That screen is for clinic admins.',
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; view?: string }>
+  searchParams: Promise<{ date?: string; view?: string; error?: string }>
 }) {
   const { clinic } = await requireStaff()
-  const { date, view } = await searchParams
+  const { date, view, error } = await searchParams
+  const errorMessage = error ? ERRORS[error] ?? null : null
 
   const dateYmd =
     date && YMD.test(date) ? date : todayYmdInTimeZone(clinic.timezone)
@@ -80,6 +87,12 @@ export default async function DashboardPage({
 
   return (
     <div>
+      {errorMessage && (
+        <p className={styles.notice} role="alert">
+          {errorMessage}
+        </p>
+      )}
+
       <div className={styles.head}>
         <div>
           <h1 className={styles.title}>Appointments · {dayLabel}</h1>

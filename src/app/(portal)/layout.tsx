@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { requireStaff } from '@/lib/portal/auth'
+import { getSetupStatus } from '@/lib/portal/setup-status'
 import styles from './portal.module.css'
 
 /**
@@ -14,6 +15,12 @@ export default async function PortalLayout({
   children: ReactNode
 }) {
   const { clinic, email, member } = await requireStaff()
+
+  // Staff, Services and Setup are all admin-only destinations, so a
+  // non-admin never sees a link that would refuse them (FR-1.11) — and
+  // never pays for the checklist query either.
+  const isAdmin = member.role === 'admin'
+  const setup = isAdmin ? await getSetupStatus(clinic.id) : null
 
   return (
     <div className={styles.shell}>
@@ -32,6 +39,21 @@ export default async function PortalLayout({
           <Link className={styles.navLink} href="/availability">
             Availability
           </Link>
+          {isAdmin && (
+            <>
+              <Link className={styles.navLink} href="/staff">
+                Staff
+              </Link>
+              <Link className={styles.navLink} href="/services">
+                Services
+              </Link>
+              {setup && !setup.complete && (
+                <Link className={styles.navLinkAlert} href="/setup">
+                  Finish setup
+                </Link>
+              )}
+            </>
+          )}
           <Link className={styles.navLink} href="/inbox">
             Inbox
           </Link>
