@@ -32,6 +32,9 @@ export default async function PortalLayout({
           <Link className={styles.navLink} href="/availability">
             Availability
           </Link>
+          <Link className={styles.navLink} href="/inbox">
+            Inbox
+          </Link>
         </nav>
 
         <div className={styles.right}>
