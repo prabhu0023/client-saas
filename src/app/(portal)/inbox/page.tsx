@@ -6,8 +6,10 @@ import styles from './inbox.module.css'
 
 /**
  * Patient message inbox (T3). Lists every thread in the clinic, with the
- * ones needing attention first: escalated, then open, then closed, each
- * newest-activity-first (the ordering lives in listThreads).
+ * ones needing attention first: escalated, then open, each
+ * newest-activity-first (the ordering lives in listThreads). 'closed' is
+ * ranked last there but nothing sets it in v1 — resolving a thread is
+ * deferred (spec §4.5).
  *
  * This is a human-relay queue — staff read and reply themselves, nothing
  * here answers a patient automatically.
@@ -81,9 +83,9 @@ function ThreadRow({
               Escalated
             </span>
           )}
-          {thread.status === 'closed' && (
-            <span className={`${styles.badge} ${styles.closed}`}>Closed</span>
-          )}
+          {/* No Closed badge: nothing writes status 'closed' in v1 —
+              thread resolution is deferred (spec §4.5), so a badge for
+              it would render a state no code path can produce. */}
         </div>
         <div className={styles.preview}>
           {thread.lastMessagePreview ?? 'No messages yet'}

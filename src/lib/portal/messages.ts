@@ -30,12 +30,20 @@ const WINDOW_MS = 24 * 60 * 60 * 1000
 
 /**
  * The one wording for a closed window, shared by the disabled reply form
- * and the server-side guard that throws, so staff see the same reason
- * whichever one stops them. Lives here rather than in the 'use server'
- * actions module, which may only export async functions.
+ * and the server-side guard that refuses the send, so staff see the same
+ * reason whichever one stops them. Lives here rather than in the
+ * 'use server' actions module, which may only export async functions.
+ *
+ * It states what this codebase actually knows — no recent message ON
+ * RECORD — rather than asserting the Meta session is closed. isWindowOpen
+ * only sees messages stored as patient_messages, and an inbound that
+ * drove the booking flow isn't one, so a patient can have a live Meta
+ * session while this notice shows. The rule stays fail-closed (the safe
+ * direction); only the sentence is honest about its own blind spot. See
+ * the spec §7 follow-up on recording a timestamp per inbound delivery.
  */
 export const WINDOW_CLOSED_NOTICE =
-  '24h WhatsApp window closed — ask the patient to message again'
+  'No recent patient message on record — ask the patient to message again'
 
 /**
  * Outcome of a staff reply attempt. The action RETURNS this rather than
@@ -342,6 +350,13 @@ export async function getThreadTimeline(
  * so it can never drift out of sync with what was actually received.
  *
  * A patient who has never messaged has no window: false, not true.
+ *
+ * Known blind spot, deliberately kept in v1: an inbound that drove the
+ * booking flow is never stored as a patient_message, so this answers
+ * false while Meta's session is open. It fails CLOSED, which is the safe
+ * direction — staff are never invited into a send Meta would reject —
+ * and WINDOW_CLOSED_NOTICE is worded to claim only what this knows.
+ * Widening it needs a per-delivery inbound timestamp (spec §7 follow-up).
  */
 export async function isWindowOpen(
   clinicId: string,
