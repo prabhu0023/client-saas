@@ -1,0 +1,291 @@
+/* Same card/typography language as staff.module.css and
+   setup.module.css — /services is another admin screen, not a new
+   visual idea. */
+
+.head {
+  margin-bottom: 16px;
+}
+.title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+.sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.error {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #991b1b;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+}
+
+.saved {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #065f46;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid #e4e6eb;
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 16px;
+  max-width: 720px;
+}
+
+.panelTitle {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.emptyInline {
+  margin: 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+/* ---------- add a service ---------- */
+
+.addForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ---------- service rows ---------- */
+
+.serviceList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.service {
+  padding: 14px 0;
+  border-top: 1px solid #f1f2f4;
+}
+
+.service:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.serviceOff {
+  opacity: 0.72;
+}
+
+.serviceHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.serviceWho {
+  min-width: 0;
+}
+
+.serviceName {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.servicePrice {
+  display: block;
+  font-size: 13px;
+  color: #6b7280;
+  font-variant-numeric: tabular-nums;
+}
+
+.badges {
+  flex: none;
+  display: flex;
+  gap: 6px;
+}
+
+.badgeOn,
+.badgeOff {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  color: #374151;
+  background: #f9fafb;
+}
+
+.badgeOn {
+  color: #065f46;
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+.badgeOff {
+  color: #92400e;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.offeredBy {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.inlineForm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---------- doctor mapping ---------- */
+
+.doctorBox {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #fbfbfc;
+  border: 1px solid #eceef1;
+  border-radius: 10px;
+}
+
+.doctorSummary {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+}
+
+.doctorHint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.doctorForm {
+  margin-top: 10px;
+}
+
+.doctorList {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+}
+
+.doctorItem {
+  padding: 3px 0;
+}
+
+.checkLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+}
+
+/* ---------- shared controls ---------- */
+
+.label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.input,
+.inputPrice {
+  padding: 8px 10px;
+  font-size: 13px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  outline: none;
+  background: #fff;
+}
+
+.inputPrice {
+  width: 96px;
+  font-variant-numeric: tabular-nums;
+}
+
+.input:focus,
+.inputPrice:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.primaryBtn {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: #2563eb;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.primaryBtn:hover {
+  background: #1d4ed8;
+}
+
+.secondaryBtn {
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.secondaryBtn:hover {
+  background: #f3f4f6;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
