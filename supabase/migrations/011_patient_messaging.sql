@@ -20,6 +20,12 @@
 -- NOTE: this feature stores clinical *communication*, not charting —
 -- no automated advice is ever generated from it (spec §1 non-goals).
 --
+-- The capture_patient_message() function below is SECURITY DEFINER and
+-- its ONLY intended caller is the service role (the WhatsApp webhook
+-- path). EXECUTE is revoked from PUBLIC/anon/authenticated at the end of
+-- this file, because a function left callable over PostgREST with the
+-- anon key would let anyone write into any clinic_id with RLS bypassed.
+--
 -- Idempotent: every CREATE is guarded, policies are dropped first, so
 -- it applies from zero and re-applies cleanly.
 -- ============================================================
@@ -34,8 +40,10 @@ CREATE TABLE IF NOT EXISTS patient_messages (
   direction       TEXT NOT NULL
                     CHECK (direction IN ('inbound', 'outbound')),
   body            TEXT NOT NULL,
-  -- Inbound: the wacrm delivery id, so a message can be traced back to
-  -- the webhook delivery. NULL for outbound/system rows.
+  -- Inbound: the WhatsApp message id when wacrm sent one, otherwise the
+  -- wacrm delivery id (the processed_wa_events dedupe key) — whichever
+  -- the webhook had, so a row can be traced back to what arrived.
+  -- NULL for outbound/system rows.
   wa_delivery_id  TEXT,
   -- Outbound: the staff user who sent the reply. NULL for inbound and
   -- for anything the system sent on the clinic's behalf (e.g. the ack).
@@ -65,6 +73,11 @@ CREATE TABLE IF NOT EXISTS patient_threads (
   -- One thread per patient per clinic; also the upsert conflict target.
   UNIQUE (clinic_id, patient_id)
 );
+
+-- Serves the inbox list read, which is always "this clinic's threads,
+-- newest activity first".
+CREATE INDEX IF NOT EXISTS idx_patient_threads_clinic_activity
+  ON patient_threads (clinic_id, last_message_at DESC);
 
 -- ------------------------------------------------------------
 -- RLS — clinic isolation for the authenticated portal path, in the
@@ -164,3 +177,21 @@ BEGIN
   RETURN QUERY SELECT v_patient_id, v_message_id, v_first;
 END;
 $$;
+
+-- ------------------------------------------------------------
+-- Who may call it. Postgres grants EXECUTE on a new public function to
+-- PUBLIC, and Supabase exposes the public schema over PostgREST to the
+-- anon and authenticated roles — so without this block anyone holding
+-- the publishable anon key could POST /rest/v1/rpc/capture_patient_message
+-- and write a patient, a message and a thread into ANY clinic_id, with
+-- RLS bypassed by SECURITY DEFINER.
+--
+-- is_clinic_member() can't be the gate here (the WhatsApp caller has no
+-- auth.uid()), so the EXECUTE grant is the only available control: the
+-- service role, which already resolved the clinic from the wacrm
+-- account, is the one caller.
+-- ------------------------------------------------------------
+REVOKE EXECUTE ON FUNCTION capture_patient_message(UUID, TEXT, TEXT, TEXT)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION capture_patient_message(UUID, TEXT, TEXT, TEXT)
+  TO service_role;

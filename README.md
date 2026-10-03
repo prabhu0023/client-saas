@@ -46,8 +46,8 @@ message falls back to the old "reply with appointment" nudge.
 
 Replies are **in-window only** in v1: staff can answer while the patient's 24h
 WhatsApp session is open, and the reply form is disabled (and the server-side
-guard throws) once it closes. That needs no new Meta template and no new env
-var; the patient is asked to message again instead.
+guard refuses the send) once it closes. That needs no new Meta template and no
+new env var; the patient is asked to message again instead.
 
 The messaging tests that need a real database are gated, so `npm test` skips
 them. To run them against a throwaway stack with the migrations applied:
@@ -59,6 +59,15 @@ TEST_DATABASE_URL=http://127.0.0.1:54321 \
 TEST_DATABASE_SERVICE_KEY=<local service_role key> \
 npx vitest run src/lib/messaging/tenancy.db.test.ts
 ```
+
+**Release gate — do not enable this feature in production before both of these
+pass.** `npm test` alone never touches a database, so the migration's
+transaction boundary, the thread upsert, the never-de-escalate rule and the two
+RLS policies are otherwise only covered by a TypeScript stand-in:
+
+1. `011_patient_messaging.sql` is applied with `supabase db push`.
+2. `src/lib/messaging/tenancy.db.test.ts` passes against a throwaway stack with
+   that migration applied (the block above), on any machine with Docker.
 
 ## Scripts
 

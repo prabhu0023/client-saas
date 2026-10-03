@@ -37,16 +37,23 @@ const WINDOW_MS = 24 * 60 * 60 * 1000
 export const WINDOW_CLOSED_NOTICE =
   '24h WhatsApp window closed — ask the patient to message again'
 
+/**
+ * Outcome of a staff reply attempt. The action RETURNS this rather than
+ * throwing: a thrown server-action error is redacted to a generic digest
+ * in production and there is no error boundary in the (portal) group, so
+ * throwing would swallow the reason — including the carefully worded
+ * WINDOW_CLOSED_NOTICE — and lose the staff member's typed reply behind
+ * a generic error screen. The reply path depends on an external wacrm
+ * call that fails routinely, so the reason has to reach the person
+ * holding the clinical answer.
+ */
+export interface ReplyState {
+  /** Null when the reply was sent and stored; the reason otherwise. */
+  error: string | null
+}
+
 /** How much of the last message body the inbox list shows. */
 const PREVIEW_CHARS = 120
-
-/**
- * How many recent messages the list scans to build previews. The inbox is
- * a working queue, not an archive; a clinic that has more than this many
- * messages across its threads simply loses the preview on the oldest
- * (quietest) threads, never a thread row itself.
- */
-const PREVIEW_SCAN_LIMIT = 500
 
 export interface ThreadListItem {
   id: string
@@ -131,8 +138,8 @@ function truncate(body: string): string {
 
 /**
  * Every thread in the clinic, ordered for the inbox queue. Previews come
- * from a second scoped read rather than a correlated subquery, which
- * supabase-js can't express.
+ * from separate scoped reads rather than a correlated subquery, which
+ * supabase-js can't express (see lastMessagePreviews).
  */
 export async function listThreads(clinicId: string): Promise<ThreadListItem[]> {
   const supabase = await createClient()
@@ -173,26 +180,43 @@ export async function listThreads(clinicId: string): Promise<ThreadListItem[]> {
     })
 }
 
-/** patient_id → truncated body of that patient's most recent message. */
+/**
+ * patient_id → truncated body of that patient's most recent message.
+ *
+ * One LIMIT 1 read per thread, issued in parallel. A single clinic-wide
+ * scan would be one round trip, but it has to be capped, and past that
+ * cap the quietest threads silently lose their preview — the exact
+ * threads that are in the inbox because nobody answered them yet. So the
+ * read count follows the thread count instead, and a missing preview
+ * then really does mean the thread has no messages.
+ */
 async function lastMessagePreviews(
   clinicId: string,
   patientIds: string[],
 ): Promise<Map<string, string>> {
   const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('patient_messages')
-    .select('patient_id, body, created_at')
-    .eq('clinic_id', clinicId)
-    .in('patient_id', patientIds)
-    .order('created_at', { ascending: false })
-    .limit(PREVIEW_SCAN_LIMIT)
 
-  if (error) throw new Error(`message previews fetch: ${error.message}`)
+  const previews = await Promise.all(
+    patientIds.map(async (patientId) => {
+      const { data, error } = await supabase
+        .from('patient_messages')
+        .select('body')
+        .eq('clinic_id', clinicId)
+        .eq('patient_id', patientId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (error) throw new Error(`message preview fetch: ${error.message}`)
+
+      const body = (data as { body: string } | null)?.body
+      return [patientId, body === undefined ? null : truncate(body)] as const
+    }),
+  )
 
   const out = new Map<string, string>()
-  for (const row of (data ?? []) as Array<{ patient_id: string; body: string }>) {
-    // Rows arrive newest-first, so the first hit per patient is the one.
-    if (!out.has(row.patient_id)) out.set(row.patient_id, truncate(row.body))
+  for (const [patientId, preview] of previews) {
+    if (preview !== null) out.set(patientId, preview)
   }
   return out
 }

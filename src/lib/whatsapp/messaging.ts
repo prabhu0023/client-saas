@@ -32,7 +32,11 @@ export interface CaptureArgs {
   waPhone: string
   /** The inbound free text, stored verbatim. */
   body: string
-  /** wacrm delivery id, for tracing a row back to its webhook delivery. */
+  /**
+   * Traceability id for the inbound row: the WhatsApp message id when
+   * the delivery carried one, else the wacrm delivery id (see the
+   * caller in src/app/api/whatsapp/inbound/route.ts).
+   */
   waMessageId?: string
 }
 

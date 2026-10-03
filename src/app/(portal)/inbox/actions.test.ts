@@ -283,55 +283,65 @@ describe('replyToThread — window open', () => {
     expect(revalidatePathMock).toHaveBeenCalledWith('/inbox/thr-a1')
   })
 
-  it('stores nothing when the send fails', async () => {
+  it('reports success with no error, so the form can clear itself', async () => {
+    const result = await replyToThread(
+      form({ threadId: 'thr-a1', body: 'Yes.' }),
+    )
+    expect(result).toEqual({ error: null })
+  })
+
+  it('stores nothing when the send fails, and returns the reason', async () => {
     sendMessageMock.mockResolvedValue({ ok: false, error: 'wacrm 500' })
-    await expect(
-      replyToThread(form({ threadId: 'thr-a1', body: 'Yes.' })),
-    ).rejects.toThrow(/reply send failed/)
+    const result = await replyToThread(
+      form({ threadId: 'thr-a1', body: 'Yes.' }),
+    )
+    // Returned, not thrown: ReplyForm renders it next to the typed body.
+    expect(result.error).toMatch(/reply send failed/)
     expect(inserts).toHaveLength(0)
   })
 })
 
 describe('replyToThread — window closed', () => {
-  it('throws without attempting a free-form send (R5)', async () => {
+  it('refuses without attempting a free-form send (R5)', async () => {
     seed(30) // last inbound 30h ago
-    await expect(
-      replyToThread(form({ threadId: 'thr-a1', body: 'Yes, it is safe.' })),
-    ).rejects.toThrow(WINDOW_CLOSED_NOTICE)
+    const result = await replyToThread(
+      form({ threadId: 'thr-a1', body: 'Yes, it is safe.' }),
+    )
+    expect(result.error).toBe(WINDOW_CLOSED_NOTICE)
 
     expect(sendMessageMock).toHaveBeenCalledTimes(0)
     expect(inserts).toHaveLength(0)
     expect(updates).toHaveLength(0)
   })
 
-  it('throws for a patient who never messaged', async () => {
+  it('refuses for a patient who never messaged', async () => {
     seed(null)
-    await expect(
-      replyToThread(form({ threadId: 'thr-a1', body: 'Hello?' })),
-    ).rejects.toThrow(WINDOW_CLOSED_NOTICE)
+    const result = await replyToThread(
+      form({ threadId: 'thr-a1', body: 'Hello?' }),
+    )
+    expect(result.error).toBe(WINDOW_CLOSED_NOTICE)
     expect(sendMessageMock).toHaveBeenCalledTimes(0)
   })
 })
 
 describe('replyToThread — rejected input', () => {
   it("refuses another clinic's thread id (R8)", async () => {
-    await expect(
-      replyToThread(form({ threadId: 'thr-b1', body: 'Hi' })),
-    ).rejects.toThrow(/thread not found/)
+    const result = await replyToThread(form({ threadId: 'thr-b1', body: 'Hi' }))
+    expect(result.error).toMatch(/thread not found/)
     expect(sendMessageMock).toHaveBeenCalledTimes(0)
   })
 
   it('refuses an empty body', async () => {
-    await expect(
-      replyToThread(form({ threadId: 'thr-a1', body: '   ' })),
-    ).rejects.toThrow(/empty/)
+    const result = await replyToThread(
+      form({ threadId: 'thr-a1', body: '   ' }),
+    )
+    expect(result.error).toMatch(/empty/)
     expect(sendMessageMock).toHaveBeenCalledTimes(0)
   })
 
   it('refuses a missing thread id', async () => {
-    await expect(replyToThread(form({ body: 'Hi' }))).rejects.toThrow(
-      /missing thread/,
-    )
+    const result = await replyToThread(form({ body: 'Hi' }))
+    expect(result.error).toMatch(/missing thread/)
   })
 })
 

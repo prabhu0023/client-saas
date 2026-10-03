@@ -10,7 +10,8 @@ import {
   type TimelineEntry,
 } from '@/lib/portal/messages'
 import { getDoctorNameMap } from '@/lib/portal/doctors'
-import { replyToThread, markThreadRead, escalateThread } from '../actions'
+import { markThreadRead, escalateThread } from '../actions'
+import { ReplyForm } from '../ReplyForm'
 import styles from '../inbox.module.css'
 
 /**
@@ -18,10 +19,9 @@ import styles from '../inbox.module.css'
  * appointments so a doubt is read next to the visit it's about (R7),
  * then the reply box, escalate and mark-read actions.
  *
- * When the 24h WhatsApp window is closed the reply controls are
- * disabled and the reason is announced via aria-describedby — the
- * server action refuses the send too (see ../actions.ts), so a closed
- * window can never turn into a silent free-form attempt (R5).
+ * The reply box itself is the client ReplyForm, so a failed send shows
+ * its reason next to the typed text instead of replacing the screen; the
+ * server action refuses an out-of-window send regardless (R5).
  */
 export default async function ThreadPage({
   params,
@@ -91,40 +91,11 @@ export default async function ThreadPage({
 
       <section className={styles.replyCard}>
         <h2 className={styles.cardTitle}>Reply on WhatsApp</h2>
-
-        {!windowOpen && (
-          <p className={styles.windowClosed} id="window-notice" role="status">
-            {WINDOW_CLOSED_NOTICE}
-          </p>
-        )}
-
-        <form className={styles.replyForm} action={replyToThread}>
-          <input type="hidden" name="threadId" value={thread.id} />
-          <label className={styles.replyLabel} htmlFor="body">
-            Your reply
-          </label>
-          <textarea
-            className={styles.replyInput}
-            id="body"
-            name="body"
-            rows={3}
-            required
-            maxLength={4000}
-            disabled={!windowOpen}
-            aria-describedby={windowOpen ? undefined : 'window-notice'}
-            placeholder={
-              windowOpen ? 'Type the clinic’s reply…' : 'Replies are closed'
-            }
-          />
-          <button
-            className={styles.sendBtn}
-            type="submit"
-            disabled={!windowOpen}
-            aria-describedby={windowOpen ? undefined : 'window-notice'}
-          >
-            Send reply
-          </button>
-        </form>
+        <ReplyForm
+          threadId={thread.id}
+          windowOpen={windowOpen}
+          closedNotice={WINDOW_CLOSED_NOTICE}
+        />
       </section>
     </div>
   )

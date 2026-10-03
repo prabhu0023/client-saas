@@ -252,6 +252,33 @@ describe('listThreads', () => {
     expect(escalated.lastMessagePreview).toBe('Still some swelling after the visit.')
   })
 
+  it('previews the quietest thread even behind a noisy one', async () => {
+    // A chatty patient pushes the other thread's only message far down a
+    // clinic-wide, newest-first read. The preview is per thread, so the
+    // quiet thread still shows its message instead of claiming it has none.
+    for (let i = 0; i < 600; i++) {
+      db.patient_messages.push({
+        id: `noise-${i}`,
+        clinic_id: CLINIC_A,
+        patient_id: 'pat-a1',
+        direction: 'inbound',
+        body: `noise ${i}`,
+        sent_by: null,
+        created_at: hoursAgo(0.5),
+      })
+    }
+
+    const threads = await listThreads(CLINIC_A)
+    const quiet = threads.find((t) => t.id === 'thr-a2')!
+    expect(quiet.lastMessagePreview).toBe('Still some swelling after the visit.')
+  })
+
+  it('has no preview for a thread with no messages', async () => {
+    db.patient_messages = []
+    const threads = await listThreads(CLINIC_A)
+    expect(threads.every((t) => t.lastMessagePreview === null)).toBe(true)
+  })
+
   it('returns an empty list when the clinic has no threads', async () => {
     db.patient_threads = []
     expect(await listThreads(CLINIC_A)).toEqual([])

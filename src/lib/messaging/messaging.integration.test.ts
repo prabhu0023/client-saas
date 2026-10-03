@@ -362,9 +362,10 @@ describe('capture → inbox → reply (one database, both paths)', () => {
     })
 
     // 3. Staff reply inside the 24h window.
-    await replyToThread(
+    const replyResult = await replyToThread(
       form({ threadId: threads[0].id, body: '  Yes, it is safe.  ' }),
     )
+    expect(replyResult.error).toBeNull()
 
     expect(sendMessageMock).toHaveBeenCalledTimes(1)
     expect(sendMessageMock.mock.calls[0][0]).toEqual({
@@ -462,9 +463,10 @@ describe('clinic isolation across the capture and portal paths (R8)', () => {
 
     // The staff identity is clinic A's; clinic B's thread id resolves to
     // nothing, so nothing is sent and nothing is stored.
-    await expect(
-      replyToThread(form({ threadId: threadB.id, body: 'Hello?' })),
-    ).rejects.toThrow(/thread not found/)
+    const result = await replyToThread(
+      form({ threadId: threadB.id, body: 'Hello?' }),
+    )
+    expect(result.error).toMatch(/thread not found/)
 
     expect(sendMessageMock).not.toHaveBeenCalled()
     expect(db.patient_messages.filter((m) => m.direction === 'outbound')).toEqual(

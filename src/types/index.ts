@@ -148,7 +148,10 @@ export interface PatientMessage {
   patient_id: string
   direction: MessageDirection
   body: string
-  /** Inbound: the wacrm delivery id. NULL for outbound/system rows. */
+  /**
+   * Inbound: the WhatsApp message id when the delivery carried one,
+   * otherwise the wacrm delivery id. NULL for outbound/system rows.
+   */
   wa_delivery_id: string | null
   /** Outbound: the staff user who replied. NULL for inbound/system. */
   sent_by: string | null

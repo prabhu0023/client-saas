@@ -287,6 +287,18 @@
   border-radius: 8px;
 }
 
+/* A failed send (wacrm error, window closed mid-edit). Same treatment as
+   dashboard.module.css .boardError. */
+.replyError {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #991b1b;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+}
+
 .replyForm {
   display: flex;
   flex-direction: column;

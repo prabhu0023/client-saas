@@ -7,6 +7,7 @@ import {
   getThread,
   isWindowOpen,
   WINDOW_CLOSED_NOTICE,
+  type ReplyState,
 } from '@/lib/portal/messages'
 import { sendMessage } from '@/lib/whatsapp/send'
 
@@ -19,11 +20,16 @@ import { sendMessage } from '@/lib/whatsapp/send'
  * nothing (R8).
  *
  * The reply path re-checks the 24h WhatsApp window SERVER-SIDE and
- * throws when it's closed. The disabled textarea in the UI is a
- * courtesy, not the boundary: a free-form send outside the window is
+ * refuses the send when it's closed. The disabled textarea in the UI is
+ * a courtesy, not the boundary: a free-form send outside the window is
  * rejected by Meta, so attempting one would silently lose a clinical
  * reply (R5). Human relay only — nothing here composes a message on the
  * clinic's behalf.
+ *
+ * replyToThread RETURNS its failure reason (ReplyState) instead of
+ * throwing so ReplyForm can render it next to the textarea with the
+ * typed body intact; mark-read and escalate still throw, as the
+ * dashboard actions do, because they take no user-authored input.
  */
 
 /** Longest reply we accept; WhatsApp text bodies cap out around 4096. */
@@ -40,26 +46,28 @@ function revalidate(threadId: string): void {
  * it as an outbound message. Stores only after wacrm accepted the send,
  * so the thread never shows a reply the patient didn't get.
  */
-export async function replyToThread(formData: FormData): Promise<void> {
+export async function replyToThread(formData: FormData): Promise<ReplyState> {
   const { clinic, userId } = await requireStaff()
 
   const threadId = String(formData.get('threadId') ?? '')
   const body = String(formData.get('body') ?? '').trim()
 
-  if (!threadId) throw new Error('missing thread')
-  if (!body) throw new Error('reply cannot be empty')
+  if (!threadId) return { error: 'missing thread' }
+  if (!body) return { error: 'reply cannot be empty' }
   if (body.length > MAX_REPLY_CHARS) {
-    throw new Error(`reply too long (max ${MAX_REPLY_CHARS} characters)`)
+    return { error: `reply too long (max ${MAX_REPLY_CHARS} characters)` }
   }
 
   const thread = await getThread(clinic.id, threadId)
-  if (!thread) throw new Error('thread not found in this clinic')
-  if (!thread.patientPhone) throw new Error('patient has no WhatsApp number')
+  if (!thread) return { error: 'thread not found in this clinic' }
+  if (!thread.patientPhone) {
+    return { error: 'patient has no WhatsApp number' }
+  }
 
   // The security boundary for R5. Never fall through to a template or a
   // best-effort send; a closed window is a hard stop.
   if (!(await isWindowOpen(clinic.id, thread.patientId))) {
-    throw new Error(WINDOW_CLOSED_NOTICE)
+    return { error: WINDOW_CLOSED_NOTICE }
   }
 
   const sent = await sendMessage({
@@ -67,7 +75,7 @@ export async function replyToThread(formData: FormData): Promise<void> {
     to: thread.patientPhone,
     body,
   })
-  if (!sent.ok) throw new Error(`reply send failed: ${sent.error}`)
+  if (!sent.ok) return { error: `reply send failed: ${sent.error}` }
 
   const supabase = await createClient()
 
@@ -79,7 +87,7 @@ export async function replyToThread(formData: FormData): Promise<void> {
     wa_delivery_id: null,
     sent_by: userId,
   })
-  if (insertErr) throw new Error(`reply store failed: ${insertErr.message}`)
+  if (insertErr) return { error: `reply store failed: ${insertErr.message}` }
 
   // Replying is also reading: the thread goes back to zero unread.
   const { error: updateErr } = await supabase
@@ -87,9 +95,10 @@ export async function replyToThread(formData: FormData): Promise<void> {
     .update({ last_message_at: new Date().toISOString(), unread_count: 0 })
     .eq('id', threadId)
     .eq('clinic_id', clinic.id)
-  if (updateErr) throw new Error(`thread update failed: ${updateErr.message}`)
+  if (updateErr) return { error: `thread update failed: ${updateErr.message}` }
 
   revalidate(threadId)
+  return { error: null }
 }
 
 /** Clear the unread badge without replying. */
