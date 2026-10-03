@@ -32,3 +32,6 @@ next-env.d.ts
 
 # supabase CLI scratch state (linked project ref, versions) — not source
 /supabase/.temp
+
+# git worktrees used by workflow agents (never commit; keep out of test/build scans)
+.worktrees/
