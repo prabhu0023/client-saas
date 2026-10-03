@@ -25,6 +25,24 @@ function revalidate(doctorId: string): void {
 }
 
 /**
+ * Same, plus the setup chrome. A rule write flips
+ * getSetupStatus().hasAvailability, which the portal layout renders as
+ * the "Finish setup" link and /setup renders as a checklist item — so it
+ * has to drop the layout cache too, exactly as a doctor-profile write in
+ * /staff does. Without it the link's accuracy rests on revalidatePath()
+ * clearing the whole client Router Cache, which Next documents as
+ * temporary behaviour.
+ *
+ * Exceptions deliberately keep the plain revalidate(): the checklist
+ * probes `availability_rules` only, so a day off cannot change it.
+ */
+function revalidateRule(doctorId: string): void {
+  revalidate(doctorId)
+  revalidatePath('/setup')
+  revalidatePath('/', 'layout')
+}
+
+/**
  * Confirm the doctor belongs to the caller's clinic before writing. RLS
  * already blocks cross-clinic writes, but this gives a clean error
  * instead of a silent no-op.
@@ -72,7 +90,7 @@ export async function addRule(formData: FormData): Promise<void> {
   })
   if (error) throw new Error(`add rule failed: ${error.message}`)
 
-  revalidate(doctorId)
+  revalidateRule(doctorId)
 }
 
 export async function toggleRule(formData: FormData): Promise<void> {
@@ -90,7 +108,7 @@ export async function toggleRule(formData: FormData): Promise<void> {
     .eq('clinic_id', clinic.id)
   if (error) throw new Error(`toggle rule failed: ${error.message}`)
 
-  revalidate(doctorId)
+  revalidateRule(doctorId)
 }
 
 export async function deleteRule(formData: FormData): Promise<void> {
@@ -107,7 +125,7 @@ export async function deleteRule(formData: FormData): Promise<void> {
     .eq('clinic_id', clinic.id)
   if (error) throw new Error(`delete rule failed: ${error.message}`)
 
-  revalidate(doctorId)
+  revalidateRule(doctorId)
 }
 
 export async function addException(formData: FormData): Promise<void> {
