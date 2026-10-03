@@ -26,14 +26,27 @@ const YMD = /^\d{4}-\d{2}-\d{2}$/
  * clinic's own doctor list, and ?date only if it is a YMD. The slot list
  * is rendered on the SERVER so the offered times can only ever come from
  * generateSlots (R3) — the client never gets to propose a time.
+ *
+ * ?reused is the one flag that carries no authority: AddPatientForm sets
+ * it when the number staff typed already belonged to a patient, and all
+ * it does is add a line saying so next to that patient's stored name
+ * (R2). It lives in the URL because the form that learned it unmounts on
+ * the redirect. The href() helper below rebuilds the query from scratch,
+ * so the notice drops off the first time staff navigate anywhere else —
+ * it is about the add they just did, not about the patient.
  */
 export default async function NewAppointmentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ patient?: string; doctor?: string; date?: string }>
+  searchParams: Promise<{
+    patient?: string
+    doctor?: string
+    date?: string
+    reused?: string
+  }>
 }) {
   const { clinic } = await requireStaff()
-  const { patient, doctor, date } = await searchParams
+  const { patient, doctor, date, reused } = await searchParams
 
   const doctors = await listClinicDoctors(clinic.id)
 
@@ -98,22 +111,30 @@ export default async function NewAppointmentPage({
         </h2>
 
         {selectedPatient ? (
-          <div className={styles.selected}>
-            <div>
-              <div className={styles.selectedName}>
-                {selectedPatient.fullName ?? 'Unnamed patient'}
+          <>
+            {reused === '1' && (
+              <p className={styles.notice} role="status">
+                This number already had a patient record. Booking under the
+                stored name below, not the one just typed.
+              </p>
+            )}
+            <div className={styles.selected}>
+              <div>
+                <div className={styles.selectedName}>
+                  {selectedPatient.fullName ?? 'Unnamed patient'}
+                </div>
+                <div className={styles.selectedMeta}>
+                  {selectedPatient.waPhone}
+                  {selectedPatient.dateOfBirth
+                    ? ` · born ${selectedPatient.dateOfBirth}`
+                    : ''}
+                </div>
               </div>
-              <div className={styles.selectedMeta}>
-                {selectedPatient.waPhone}
-                {selectedPatient.dateOfBirth
-                  ? ` · born ${selectedPatient.dateOfBirth}`
-                  : ''}
-              </div>
+              <Link className={styles.change} href={href({ patient: null })}>
+                Change patient
+              </Link>
             </div>
-            <Link className={styles.change} href={href({ patient: null })}>
-              Change patient
-            </Link>
-          </div>
+          </>
         ) : (
           <PatientSearch doctorId={selectedDoctorId} dateYmd={dateYmd} />
         )}

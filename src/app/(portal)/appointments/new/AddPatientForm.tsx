@@ -13,9 +13,13 @@ import styles from './new-appointment.module.css'
  * can't afford.
  *
  * A number that already belongs to a patient is not an error — the
- * action hands back the existing record and we say so, because staff
- * need to know the curated name they're about to book under is the
- * stored one, not what they just typed (R2).
+ * action hands back the existing record and booking continues on it
+ * (R2). Staff still have to be TOLD that, because the name they typed
+ * was discarded in favour of the stored one, and a clinical booking must
+ * not change the name under it silently. The notice can't be rendered
+ * here: this form unmounts the moment the selection lands in the URL, so
+ * `reused` rides along as `?reused=1` and page.tsx shows it on the
+ * selected-patient card, where the name it is talking about is visible.
  */
 export function AddPatientForm({
   doctorId,
@@ -31,7 +35,6 @@ export function AddPatientForm({
   const [dateOfBirth, setDateOfBirth] = useState('')
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -44,17 +47,21 @@ export function AddPatientForm({
     fd.set('notes', notes)
 
     setError(null)
-    setNotice(null)
     startTransition(async () => {
       const result = await addPatient(fd)
       if (result.error || !result.patient) {
         setError(result.error ?? 'could not save the patient')
         return
       }
-      if (result.reused) setNotice('Using the existing record for this number')
-      router.push(
-        `/appointments/new?patient=${result.patient.id}&doctor=${doctorId}&date=${dateYmd}`,
-      )
+      const params = new URLSearchParams({
+        patient: result.patient.id,
+        doctor: doctorId,
+        date: dateYmd,
+      })
+      // Tells the next render that this patient was an EXISTING record,
+      // not one created from what was just typed.
+      if (result.reused) params.set('reused', '1')
+      router.push(`/appointments/new?${params.toString()}`)
     })
   }
 
@@ -65,11 +72,6 @@ export function AddPatientForm({
       {error && (
         <p className={styles.error} role="alert">
           {error}
-        </p>
-      )}
-      {notice && (
-        <p className={styles.notice} role="status">
-          {notice}
         </p>
       )}
 
