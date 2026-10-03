@@ -253,6 +253,11 @@ $$;
 --
 --    The anti-hijack guarantee survives in the form that matters:
 --    no clinic can take over an id that is CURRENTLY ROUTING TRAFFIC.
+--
+--    EVERY refusal is checked before ANY write (steps 3 and 3b precede
+--    steps 4-6). A returned outcome row does not roll the transaction
+--    back, so a conflict test placed after a write would commit a
+--    half-applied connect — see step 3b.
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION connect_wacrm_account(
   p_clinic_id        UUID,
@@ -312,6 +317,34 @@ BEGIN
     RETURN;
   END IF;
 
+  -- (3b) The SAME status-filtered test for the other globally-unique id,
+  --      and it runs HERE — before any write — on purpose.
+  --
+  --      A returned refusal row is NOT a rollback: plpgsql commits
+  --      everything the function has already written when it simply
+  --      RETURNs. Testing the number after steps 4 and 5 would therefore
+  --      leave a refused connect half-applied: the admin is told "that
+  --      number belongs to another clinic" while their wacrm mapping has
+  --      silently moved to the id they just typed and their working one
+  --      has been disabled — a clinic losing its live WhatsApp routing on
+  --      an operation that was REJECTED. Every refusal must precede every
+  --      write, which is what makes this one transaction (NFR-4) and what
+  --      §9.2 step 6's "one failure, not a half-applied connect" means.
+  --
+  --      Only another clinic's ACTIVE row is a conflict, exactly as in
+  --      step 3: phone_number_id is globally UNIQUE (001) and step 6 below
+  --      is itself what sets rows to 'disconnected', so an unfiltered test
+  --      would permanently burn any number a clinic ever recorded.
+  IF p_phone_number_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM clinic_whatsapp_numbers wn
+    WHERE wn.phone_number_id = p_phone_number_id
+      AND wn.clinic_id <> p_clinic_id
+      AND wn.status = 'active'
+  ) THEN
+    RETURN QUERY SELECT 'phone_number_taken'::TEXT;
+    RETURN;
+  END IF;
+
   -- (4) Retire this clinic's other active mapping, keeping the partial
   --     unique index (below) satisfied. Skips the id being submitted,
   --     so re-saving the same id is idempotent.
@@ -330,20 +363,10 @@ BEGIN
     SET clinic_id = p_clinic_id,
         status    = 'active';
 
-  -- (6) The optional Meta phone_number_id row, same rule as step 3.
-  --     A collision rolls the WHOLE function back, so the admin sees
-  --     one failure rather than a half-applied connect.
+  -- (6) The optional Meta phone_number_id row. Its conflict test already
+  --     ran at step 3b, so by the time control reaches here nothing can
+  --     refuse the connect and both tables are written or neither is.
   IF p_phone_number_id IS NOT NULL THEN
-    IF EXISTS (
-      SELECT 1 FROM clinic_whatsapp_numbers wn
-      WHERE wn.phone_number_id = p_phone_number_id
-        AND wn.clinic_id <> p_clinic_id
-        AND wn.status = 'active'
-    ) THEN
-      RETURN QUERY SELECT 'phone_number_taken'::TEXT;
-      RETURN;
-    END IF;
-
     UPDATE clinic_whatsapp_numbers wn
        SET status = 'disconnected'
      WHERE wn.clinic_id = p_clinic_id

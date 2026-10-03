@@ -405,6 +405,8 @@ describe.skipIf(!ENABLED)('self-serve onboarding (real DB)', () => {
     let acctOne: string
     let acctTwo: string
     let acctThree: string
+    let acctFour: string
+    let acctFive: string
     let phoneOne: string
     let phoneTwo: string
 
@@ -414,6 +416,8 @@ describe.skipIf(!ENABLED)('self-serve onboarding (real DB)', () => {
       acctOne = wacrmId()
       acctTwo = wacrmId()
       acctThree = wacrmId()
+      acctFour = wacrmId()
+      acctFive = wacrmId()
       phoneOne = phoneNumberId()
       phoneTwo = phoneNumberId()
     })
@@ -470,24 +474,36 @@ describe.skipIf(!ENABLED)('self-serve onboarding (real DB)', () => {
       expect(await activeWacrmRows(b.clinicId)).toHaveLength(0)
     })
 
-    it("case 9 — a phone_number_id held by another clinic is refused and leaves the wacrm mapping alone", async () => {
+    it('case 9 — a phone_number_id held by another clinic refuses the WHOLE connect', async () => {
       // B takes a number of its own first.
       expect(
         rpcRow<OutcomeRow>(await connect(b, acctThree, phoneOne), 'b-number').outcome,
       ).toBe('ok')
 
-      // A now asks for that number. The refusal is typed, and A's own
-      // mapping is exactly as it was.
+      // A submits a BRAND-NEW account id together with B's live number.
+      // This is the form that actually proves the transaction: a
+      // conflict test placed after the wacrm claim would commit it, so a
+      // REFUSED connect would silently move A off its working mapping.
       const row = rpcRow<OutcomeRow>(
-        await connect(a, acctOne, phoneOne),
+        await connect(a, acctFour, phoneOne),
         'phone-conflict',
       )
       expect(row.outcome).toBe('phone_number_taken')
 
+      // A's mapping is exactly as it was before the refused call.
       const active = await activeWacrmRows(a.clinicId)
       expect(active).toHaveLength(1)
       expect(active[0].wacrm_account_id).toBe(acctOne)
       expect(active[0].status).toBe('active')
+      await expect(resolveClinicIdByWacrmAccount(acctOne)).resolves.toBe(a.clinicId)
+
+      // And the id A typed was never claimed — not active, not disabled,
+      // no row at all.
+      const { data: unclaimed } = await db
+        .from('clinic_wacrm_accounts')
+        .select('id')
+        .eq('wacrm_account_id', acctFour)
+      expect(unclaimed).toEqual([])
 
       // Nothing landed in the numbers table for A either.
       const { data: numbers } = await db
@@ -496,6 +512,7 @@ describe.skipIf(!ENABLED)('self-serve onboarding (real DB)', () => {
         .eq('phone_number_id', phoneOne)
       expect(numbers).toHaveLength(1)
       expect(numbers![0]).toMatchObject({ clinic_id: b.clinicId, status: 'active' })
+      expect(await activeNumbers(a.clinicId)).toHaveLength(0)
     })
 
     it('case 10 — a second ACTIVE mapping for one clinic is rejected by the partial index', async () => {
@@ -588,21 +605,31 @@ describe.skipIf(!ENABLED)('self-serve onboarding (real DB)', () => {
       expect(aActive[0].wacrm_account_id).toBe(acctTwo)
       await expect(resolveClinicIdByWacrmAccount(acctTwo)).resolves.toBe(a.clinicId)
 
-      // Same for the number: A's active number stays A's, and B's own
-      // wacrm mapping is left exactly as it was.
+      // Same for the number, submitted the same way case 9 does it: a
+      // BRAND-NEW account id alongside A's live number, so the refusal
+      // has something to roll back if it is in the wrong place.
       const aNumberBefore = (await activeNumbers(a.clinicId))[0]
       const bAccountBefore = (await activeWacrmRows(b.clinicId))[0]
       const refusedNumber = rpcRow<OutcomeRow>(
-        await connect(b, bAccountBefore.wacrm_account_id, aNumberBefore.phone_number_id),
+        await connect(b, acctFive, aNumberBefore.phone_number_id),
         'live-number',
       )
       expect(refusedNumber.outcome).toBe('phone_number_taken')
 
+      // A's number is untouched.
       const aNumberAfter = (await activeNumbers(a.clinicId))[0]
       expect(aNumberAfter.phone_number_id).toBe(aNumberBefore.phone_number_id)
       expect(aNumberAfter.status).toBe('active')
+
+      // B's own wacrm mapping is unchanged and the id it typed was never
+      // claimed.
       const bAccountAfter = (await activeWacrmRows(b.clinicId))[0]
       expect(bAccountAfter.wacrm_account_id).toBe(bAccountBefore.wacrm_account_id)
+      const { data: unclaimed } = await db
+        .from('clinic_wacrm_accounts')
+        .select('id')
+        .eq('wacrm_account_id', acctFive)
+      expect(unclaimed).toEqual([])
     })
   })
 
