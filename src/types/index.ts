@@ -16,6 +16,7 @@ export type AppointmentStatus =
 export type CreatedVia = 'whatsapp' | 'portal'
 export type MessageDirection = 'inbound' | 'outbound'
 export type ThreadStatus = 'open' | 'escalated' | 'closed'
+export type InviteStatus = 'pending' | 'accepted' | 'revoked'
 
 export interface Clinic {
   id: string
@@ -168,6 +169,39 @@ export interface PatientThread {
   escalated_to_doctor_id: string | null
   last_message_at: string | null
   unread_count: number
+  created_at: string
+}
+
+// ------------------------------------------------------------
+// Staff invites — mirror supabase/migrations/013.
+// ------------------------------------------------------------
+
+/**
+ * A pending/consumed staff invite.
+ *
+ * `token_hash` is deliberately OMITTED from this type: the plaintext
+ * token is shown to the admin exactly once and the hash is never
+ * client-visible, so no component should be able to render or log it.
+ * `loadInviteByToken()` QUERIES BY the hash and never selects it back.
+ */
+export interface ClinicInvite {
+  id: string
+  clinic_id: string
+  /** Always stored lower-cased (CHECK constraint in 013). */
+  email: string
+  role: MemberRole
+  /** Doctor invites only; NULL for every other role (CHECK in 013). */
+  specialty: string | null
+  /** Doctor invites only; defaults to 15 at acceptance when NULL. */
+  slot_duration_minutes: number | null
+  status: InviteStatus
+  /** Expiry is derived at read time — a row stays 'pending' past it. */
+  expires_at: string
+  /** clinic_members.id of the admin who issued it. */
+  created_by: string | null
+  /** users.id of the invitee, set at acceptance. */
+  accepted_by: string | null
+  accepted_at: string | null
   created_at: string
 }
 

@@ -48,8 +48,10 @@ export async function requireStaff(): Promise<StaffContext> {
     throw new Error(`failed to load membership: ${memberErr.message}`)
   }
   if (!member) {
-    // Logged in but not an active member of any clinic — no portal access.
-    redirect('/login?error=no-clinic')
+    // Signed in with no active membership — which is the normal state of
+    // someone who just signed up, so it is onboarding, not an error.
+    // /onboarding is outside the (portal) group, so this cannot loop.
+    redirect('/onboarding')
   }
 
   const { data: clinic, error: clinicErr } = await supabase

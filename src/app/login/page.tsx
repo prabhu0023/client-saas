@@ -1,12 +1,16 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getStaffContext } from '@/lib/portal/auth'
 import { signIn } from './actions'
 import styles from './login.module.css'
 
+// 'no-clinic' is gone: requireStaff() was its only producer and it now
+// sends a clinic-less user to /onboarding, so a stale bookmark falls
+// through to the generic message rather than claiming something untrue.
 const ERRORS: Record<string, string> = {
   missing: 'Enter your email and password.',
   invalid: 'Incorrect email or password.',
-  'no-clinic': 'This account is not an active member of any clinic.',
+  'signin-after-signup': 'Account created — please sign in.',
 }
 
 export default async function LoginPage({
@@ -66,6 +70,10 @@ export default async function LoginPage({
             Sign in
           </button>
         </form>
+
+        <p className={styles.foot}>
+          New here? <Link href="/signup">Create a clinic</Link>
+        </p>
       </div>
     </div>
   )

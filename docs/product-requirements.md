@@ -75,7 +75,7 @@ the beachhead.
 | **Doctor** | Staff web portal | See their schedule; `doctor_profiles` sets slot length & specialty. |
 | **Nurse** | Staff web portal | (Role exists in schema; deeper workflows deferred.) |
 | **Clinic admin** | Staff web portal | Clinic config, staff, availability, services. |
-| **Platform operator** | Infra / scheduler | Runs cron, monitors health, handles onboarding (seed today; self-serve planned). |
+| **Platform operator** | Infra / scheduler | Runs cron, monitors health; clinics onboard themselves through `/signup` (the seed is demo data only). |
 
 ---
 
@@ -140,8 +140,8 @@ domain. 🚦 marks production-launch gates.
 | F4.3 | Doctor names (RLS-safe) | ✅ | `SECURITY DEFINER` view/RPC exposes member names within the caller's clinic only. |
 | F4.4 | Multi-day / week view | ✅ | Next/prev day + week overview with per-day counts. |
 | F4.5 | View + edit availability | ✅ | Weekly `availability_rules` + date `availability_exceptions`; changes immediately alter WhatsApp slot offers. |
-| F4.6 | Services management (portal) | ⬜ | `services` + `doctor_services` exist; add UI to manage them. |
-| F4.7 | Staff invite / role management UI | ⬜ | Invite/enrol staff + assign roles without SQL. |
+| F4.6 | Services management (portal) | ✅ | `/services`: name + price CRUD, deactivate (never delete — history keeps the name), doctor-service mapping through `set_doctor_services`. Admin-only. |
+| F4.7 | Staff invite / role management UI | ✅ | `/staff`: one-time invite links (`/join/<token>`), roles, enable/disable, doctor profiles. Admin-only; last-admin and doctor-role invariants enforced in the DB. |
 | F4.8 | Clinic switcher (multi-clinic staff) | ⏭️ | `requireStaff()` picks first active membership; add switcher when a real multi-clinic user exists. |
 
 ### 4.5 Tenant / clinic lifecycle
@@ -304,8 +304,12 @@ ALTER TABLE appointments ADD CONSTRAINT no_overlap
 | 008 | wa_session_cancel_step | widen `wa_sessions.step` CHECK (`awaiting_cancel`) |
 | 009 | wa_session_reschedule_step | widen CHECK (`awaiting_reschedule`) |
 | 010 | clinic_doctor_names_fn | `clinic_doctor_names` RPC (SECURITY DEFINER, member-gated) |
+| 011 | patient_messaging | `patient_messages` + `patient_threads` + RLS + `capture_patient_message` RPC |
+| 012 | clinic_onboarding | `is_clinic_admin()`, `my_membership_status()`, `clinic_member_identities()`, `create_clinic_with_owner` + `connect_wacrm_account` RPCs, last-admin + doctor-profile guard triggers, one active wacrm mapping per clinic |
+| 013 | clinic_invites | `clinic_invites` (hash-only tokens, admin-only RLS) + `accept_clinic_invite` RPC |
+| 014 | admin_write_policies | member-read / admin-write split over the seven tenant-config tables + `set_doctor_services` RPC |
 
-> Next migration to add is **011**. Full ERD in `clinic-saas-architecture.md` §4.
+> Next migration to add is **015**. Full ERD in `clinic-saas-architecture.md` §4.
 
 ---
 
@@ -424,7 +428,7 @@ src/
 │   │             · verify-signature.ts · types.ts
 │   └── portal/ auth.ts · appointments.ts
 ├── reminders/            # scheduler + template-send helpers
-supabase/migrations/      # 001–010 (see §6)
+supabase/migrations/      # 001–014 (see §6)
 scripts/ seed.ts · wacrm-setup.ts · build.sh · start.sh · run.sh
 ```
 (Historical annotated tree: `docs/archive/clinic-saas-folder-structure.md`.)

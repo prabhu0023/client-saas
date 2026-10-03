@@ -43,9 +43,11 @@
 | SEC-2 | PII-safe logging + data retention policy | E-Sec | P1 🚦 | M | Backlog |
 | COMP-1 | Compliance posture (HIPAA/GDPR/DPDP + Meta) | E-Comp | P0 🚦 | L | Backlog |
 | COMP-2 | Patient consent model | E-Comp | P0 🚦 | M | Backlog |
-| ONB-1 | Self-serve clinic onboarding | E-Onboard | P1 🚦 | L | Backlog |
-| ONB-2 | Staff invite / role management UI | E-Onboard | P2 | M | Backlog |
-| ONB-3 | Services management (portal) | E-Onboard | P2 | M | Backlog |
+| ONB-1 | Self-serve clinic onboarding | E-Onboard | P1 🚦 | L | Done (built) |
+| ONB-2 | Staff invite / role management UI | E-Onboard | P2 | M | Done (built) |
+| ONB-3 | Services management (portal) | E-Onboard | P2 | M | Done (built) |
+| ONB-4 | `doctor_profiles.active` — retire a doctor with history | E-Onboard | P2 | M | Backlog |
+| ONB-5 | Credential recovery (password reset / admin reset) | E-Onboard | P2 | M | Backlog |
 | LAUNCH-5 | End-to-end rehearsal on real WhatsApp | E-Channel | P0 🚦 | M | Backlog |
 | P2-* | Phase 2 (revenue + clinical) | see §3.9 | P3 | — | Backlog |
 
@@ -84,9 +86,11 @@ Stage 4 — Compliance gate  (before ANY real patient data)
   └─ COMP-2  (consent model)
 
 Stage 5 — Let real clinics in
-  ├─ ONB-1  (self-serve onboarding)
-  ├─ ONB-2  (staff invites)         [can follow ONB-1]
-  └─ ONB-3  (services management)   [can follow ONB-1]
+  ├─ ONB-1  (self-serve onboarding)   [built; gate still blocked on Stage 4]
+  ├─ ONB-2  (staff invites)           [built]
+  ├─ ONB-3  (services management)     [built]
+  ├─ ONB-4  (retire a doctor with history)
+  └─ ONB-5  (credential recovery)
 
 Stage 6 — Rehearse & launch  (dep: all P0/P1 🚦 done)
   └─ LAUNCH-5  (end-to-end on real WhatsApp) → GO LIVE
@@ -242,21 +246,63 @@ inline. Phase 2 is **lean** — refers to the backlog.
 
 ### E-Onboard — let real clinics in
 
-#### ONB-1 — Self-serve clinic onboarding · P1 🚦 · L
+#### ONB-1 — Self-serve clinic onboarding · P1 🚦 · L · Done (built)
 - **Do:** UI/flow to create a clinic (name, slug, timezone), connect its wacrm
   account, and enrol the first admin — replacing the seed script.
 - **Accept:** a new clinic can onboard end-to-end with no SQL.
 - **Dep:** COMP-1/COMP-2 (real clinics ⇒ real data ⇒ compliance in place).
+- **Status:** implementation complete; 🚦 gate blocked on COMP-1/COMP-2 before
+  real clinics are admitted. Shipping the code does not answer the question this
+  gate exists to answer, so the gate stays **open**. Shipped as `/signup` →
+  `/onboarding` → `/setup` with migrations `012`–`014`; the DB-backed suite
+  (`src/lib/portal/onboarding.integration.test.ts`) is a README release gate and
+  has **not been executed** yet — see the README.
 
-#### ONB-2 — Staff invite / role management UI · P2 · M
+#### ONB-2 — Staff invite / role management UI · P2 · M · Done (built)
 - **Do:** invite staff, assign roles (doctor/nurse/receptionist/admin) in-portal.
 - **Accept:** an admin adds staff without SQL; roles enforced.
 - **Dep:** ONB-1.
+- **Status:** shipped as `/staff` + `/join/<token>` one-time invite links.
 
-#### ONB-3 — Services management (portal) · P2 · M
+#### ONB-3 — Services management (portal) · P2 · M · Done (built)
 - **Do:** CRUD for `services` + `doctor_services` in the portal.
 - **Accept:** staff manage services + doctor-service mapping without SQL.
 - **Dep:** ONB-1.
+- **Status:** shipped as `/services`; removal is deactivation, so an appointment
+  keeps the service name it was booked under.
+
+#### ONB-4 — `doctor_profiles.active`: retire a doctor who has history · P2 · M
+- **Do:** add an `active` flag to `doctor_profiles` and a "retire" action, so a
+  doctor who has appointment history can stop being offered without deleting the
+  row.
+- **Why:** `appointments.doctor_id` is `ON DELETE CASCADE` and
+  `doctor_profiles_guard()` now refuses the delete outright, so today the only
+  options are "keep offering them" or "destroy their appointment history". The
+  refusal is correct; the missing capability is the retire flag.
+- **Accept:** a retired doctor disappears from every booking surface, their past
+  appointments still render with their name, and nothing cascades.
+- **Note:** the fix must touch **all four** doctor readers, which all key on
+  `clinic_members.status` today: `src/lib/whatsapp/query.ts`
+  (`loadDoctorOptions` / `loadDoctorLabel`), `src/lib/portal/availability.ts`
+  (`listClinicDoctors`), `src/lib/portal/new-appointment.ts`
+  (`getDoctorSlotMinutes`) and `clinic_doctor_names` in
+  `010_clinic_doctor_names_fn.sql`. Miss one and a retired doctor is still
+  bookable from that surface.
+- **Dep:** ONB-2.
+
+#### ONB-5 — Credential recovery · P2 · M
+- **Do:** password reset for staff, and/or an admin "reset this member's
+  password" action on `/staff`.
+- **Why:** a redeemed invite link cannot be un-redeemed. An invite claimed by the
+  wrong person locks the real invitee out of their own email's account, and the
+  only remedy today is operator-level `auth.admin.deleteUser()` plus a fresh
+  invite.
+- **Accept:** a locked-out staff member regains access without an operator
+  touching the database.
+- **Shape:** service role `auth.admin.updateUserById`, gated on
+  `requireAdmin()`; or Supabase's own reset-password email flow if SMTP is
+  configured by then.
+- **Dep:** ONB-2.
 
 ### 3.9 Phase 2 — revenue & clinical (post-launch, lean)
 
@@ -289,7 +335,9 @@ gates apply per-feature when enabled.
 - **Recoverable:** REL-1, REL-3
 - **Secured:** SEC-1, SEC-2
 - **Compliant:** COMP-1, COMP-2
-- **Onboardable:** ONB-1
+- **Onboardable:** ONB-1 — **still open.** The code is built, but the gate is
+  blocked on COMP-1/COMP-2: real clinics mean real patient data, and admitting
+  them is a product decision, not a docs edit.
 
 > P2 tickets and P2/P3 non-gate items are explicitly **out** of the launch gate.
 
