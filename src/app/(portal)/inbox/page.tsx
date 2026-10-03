@@ -62,7 +62,10 @@ function ThreadRow({
     <Link className={styles.row} href={`/inbox/${thread.id}`}>
       <div className={styles.details}>
         <div className={styles.patient}>
-          {thread.patientName ?? thread.patientPhone ?? 'Unknown patient'}
+          {/* `||` not `??`: an unnamed patient has full_name null AND a
+              missing patient row yields '', both of which must fall
+              through to the next label rather than render blank. */}
+          {thread.patientName || thread.patientPhone || 'Unknown patient'}
           {thread.unreadCount > 0 && (
             <span
               className={styles.unread}

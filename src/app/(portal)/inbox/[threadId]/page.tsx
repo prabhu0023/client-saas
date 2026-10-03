@@ -41,7 +41,9 @@ export default async function ThreadPage({
     thread.escalatedToDoctorId ? getDoctorNameMap(clinic.id) : new Map(),
   ])
 
-  const patientLabel = thread.patientName ?? thread.patientPhone
+  // Same label ladder as the list: fall through on null AND on ''.
+  const patientLabel =
+    thread.patientName || thread.patientPhone || 'Unknown patient'
 
   return (
     <div>

@@ -17,11 +17,12 @@ import type {
  * user (R8) — same contract as src/lib/portal/appointments.ts.
  *
  * This is deliberately a separate module from
- * src/lib/whatsapp/messaging.ts, which does the same domain on the
- * service-role client for the patient (no-login) side. The 24h-window
- * question is answered on BOTH sides, so it is implemented twice on
- * purpose — the portal must never read patient data through a client
- * that bypasses RLS.
+ * src/lib/whatsapp/messaging.ts, which covers the same domain on the
+ * service-role client for the patient (no-login) side: that one only
+ * WRITES, because the portal must never read patient data through a
+ * client that bypasses RLS. So every read in this feature — including
+ * the single answer to the 24h-window question (isWindowOpen below) —
+ * lives here, with no second copy of the rule to drift from.
  */
 
 /** Free-form WhatsApp replies are only allowed inside this window. */

@@ -1,18 +1,25 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 
 /**
- * Patient-messaging write/read path for the WhatsApp channel (T2).
+ * Patient-messaging write path for the WhatsApp channel (T2).
  *
  * Runs on the service-role client because the actor is a patient with no
  * login, so RLS can't apply (see src/lib/supabase/admin.ts). That makes
  * tenancy this module's responsibility: every statement here is scoped
- * by clinic_id — and, where a patient is already known, by patient_id as
- * well — so a clinic can never see another clinic's thread (R8/R10).
+ * by the clinic_id the caller already resolved from the wacrm account,
+ * so a clinic can never touch another clinic's thread (R8/R10).
  *
  * The capture itself is three writes that must land together (upsert
  * patient, insert message, bump thread), so it lives in the
  * `capture_patient_message` RPC (migration 011); this is the typed
  * wrapper around it, in the same shape as src/lib/booking/book.ts.
+ *
+ * WRITE-ONLY ON PURPOSE: the 24h free-form reply window (spec §4.5) is
+ * decided on the staff side, by isWindowOpen in src/lib/portal/messages.ts,
+ * on the RLS client. It is deliberately NOT answered here — a reader on
+ * the service-role client would bypass RLS for a logged-in staff user,
+ * and a second copy of the rule could drift from the one the reply guard
+ * enforces. Do not add a window/transcript read to this module.
  *
  * Nothing here throws: an inbound webhook that fails to persist should
  * degrade to the plain fallback nudge, never to a 500 that makes wacrm
@@ -81,32 +88,4 @@ export async function capturePatientMessage(
     messageId: row.message_id,
     isFirstMessage: row.is_first_message === true,
   }
-}
-
-/**
- * Timestamp of the patient's most recent INBOUND message, which is what
- * the 24h free-form reply window is derived from (spec §4.5). Scoped by
- * BOTH clinic_id and patient_id: on the service-role client a patient_id
- * alone would read across tenants.
- */
-export async function latestInboundAt(
-  clinicId: string,
-  patientId: string,
-): Promise<string | null> {
-  const db = supabaseAdmin()
-  const { data, error } = await db
-    .from('patient_messages')
-    .select('created_at')
-    .eq('clinic_id', clinicId)
-    .eq('patient_id', patientId)
-    .eq('direction', 'inbound')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (error) {
-    console.error('[messaging] latestInboundAt failed:', error.message)
-    return null
-  }
-  return (data as { created_at: string } | null)?.created_at ?? null
 }

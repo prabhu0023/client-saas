@@ -4,21 +4,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  * Tests for the patient-messaging DB wrapper (T2).
  *
  * The service-role client is replaced with a tiny chainable fake that
- * models only the two shapes this module uses:
- *   1. .rpc('capture_patient_message', args) → SETOF one row, and
- *   2. the SELECT chain behind latestInboundAt.
- * Both record their arguments so the RPC payload and — importantly for
- * tenancy (R8) — the filters on the read can be asserted.
+ * models the one shape this module uses:
+ * .rpc('capture_patient_message', args) → SETOF one row. It records its
+ * arguments so the RPC payload — including the clinic_id that carries
+ * tenancy on this RLS-bypassing path (R8) — can be asserted.
+ *
+ * The module is write-only by design; the 24h window is read on the
+ * portal's RLS client and covered by src/lib/portal/messages.test.ts.
  */
 
 // ---- supabaseAdmin fake ------------------------------------------------
 let rpcCalls: Array<{ fn: string; args: Record<string, unknown> }>
 let rpcResult: { data: unknown; error: { message: string } | null }
-
-// Filters applied by the latestInboundAt chain, and its scripted result.
-let selectFilters: Array<[string, string]>
-let selectTable: string | null
-let selectResult: { data: unknown; error: { message: string } | null }
 
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: () => ({
@@ -26,24 +23,10 @@ vi.mock('@/lib/supabase/admin', () => ({
       rpcCalls.push({ fn, args })
       return rpcResult
     },
-    from: (table: string) => {
-      selectTable = table
-      const chain = {
-        select: () => chain,
-        eq: (col: string, val: string) => {
-          selectFilters.push([col, val])
-          return chain
-        },
-        order: () => chain,
-        limit: () => chain,
-        maybeSingle: async () => selectResult,
-      }
-      return chain
-    },
   }),
 }))
 
-import { capturePatientMessage, latestInboundAt } from './messaging'
+import { capturePatientMessage } from './messaging'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -54,9 +37,6 @@ beforeEach(() => {
     ],
     error: null,
   }
-  selectFilters = []
-  selectTable = null
-  selectResult = { data: { created_at: '2026-09-28T10:00:00.000Z' }, error: null }
 })
 
 describe('capturePatientMessage', () => {
@@ -110,29 +90,5 @@ describe('capturePatientMessage', () => {
       body: 'anything',
     })
     expect(res).toBeNull()
-  })
-})
-
-describe('latestInboundAt', () => {
-  it('scopes the read by clinic_id AND patient_id AND inbound direction', async () => {
-    const at = await latestInboundAt('clinic-1', 'pat-1')
-
-    expect(selectTable).toBe('patient_messages')
-    expect(selectFilters).toEqual([
-      ['clinic_id', 'clinic-1'],
-      ['patient_id', 'pat-1'],
-      ['direction', 'inbound'],
-    ])
-    expect(at).toBe('2026-09-28T10:00:00.000Z')
-  })
-
-  it('returns null when the patient has no inbound messages', async () => {
-    selectResult = { data: null, error: null }
-    expect(await latestInboundAt('clinic-1', 'pat-1')).toBeNull()
-  })
-
-  it('returns null on a read error', async () => {
-    selectResult = { data: null, error: { message: 'boom' } }
-    expect(await latestInboundAt('clinic-1', 'pat-1')).toBeNull()
   })
 })
