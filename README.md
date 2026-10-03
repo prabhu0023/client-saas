@@ -30,9 +30,35 @@ Migrations live in `supabase/migrations/`:
 - `003_rls_policies.sql` — RLS clinic isolation for the staff portal
 - `004_book_appointment_fn.sql` — transactional book-appointment function
 - `005_processed_wa_events.sql` — inbound WhatsApp event dedupe table
+- `011_patient_messaging.sql` — patient messaging inbox: `patient_messages` +
+  `patient_threads`, their RLS policies, and the `capture_patient_message` RPC
+  that stores an inbound message and bumps its thread in one transaction
 
 Apply them with the Supabase CLI (`supabase db push`) or paste into the SQL
 editor in order.
+
+### Patient messaging inbox
+
+A non-booking WhatsApp message is no longer lost: it is captured into the
+patient's thread and answered by staff from `/inbox`. Run `supabase db push` so
+`011_patient_messaging.sql` is applied — without it every inbound free-text
+message falls back to the old "reply with appointment" nudge.
+
+Replies are **in-window only** in v1: staff can answer while the patient's 24h
+WhatsApp session is open, and the reply form is disabled (and the server-side
+guard throws) once it closes. That needs no new Meta template and no new env
+var; the patient is asked to message again instead.
+
+The messaging tests that need a real database are gated, so `npm test` skips
+them. To run them against a throwaway stack with the migrations applied:
+
+```bash
+supabase start
+supabase db push
+TEST_DATABASE_URL=http://127.0.0.1:54321 \
+TEST_DATABASE_SERVICE_KEY=<local service_role key> \
+npx vitest run src/lib/messaging/tenancy.db.test.ts
+```
 
 ## Scripts
 
