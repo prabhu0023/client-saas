@@ -43,6 +43,9 @@ type ViewMode = 'board' | 'agenda'
 // silent and reads as a broken link (§11.2); mirrors login/page.tsx.
 const ERRORS: Record<string, string> = {
   'admin-only': 'That screen is for clinic admins.',
+  // /join sends an invitee here when the invite resolved to already_member
+  // at THIS clinic — they are in, there is simply nothing to accept (§12.2).
+  'already-member': 'You are already a member.',
 }
 
 export default async function DashboardPage({
