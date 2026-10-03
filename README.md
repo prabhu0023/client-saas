@@ -20,6 +20,28 @@ cp .env.local.example .env.local   # fill in Supabase + secrets
 npm run dev
 ```
 
+### Bringing up a real clinic
+
+Apply the migrations (below), then open **`/signup`** and create the clinic from
+the browser: account → clinic name, slug and timezone → connect the wacrm
+account → invite staff → availability → services. No SQL and no seed script.
+
+Two env vars gate it:
+
+- `ONBOARDING_SIGNUP_CODE` — the shared code `/signup` asks for
+  (`openssl rand -hex 16`). With it unset, signup is **open** in development and
+  **disabled** everywhere else, so a deployment never exposes an ungated signup
+  form by accident.
+- `NEXT_PUBLIC_APP_URL` — the public base URL invite links are built from.
+  Invites refuse to be created without it, by design, so a misconfiguration
+  cannot burn invite tokens.
+
+Set both in the host (e.g. Vercel) and **redeploy** — a running deployment keeps
+the old env values.
+
+`npm run seed` stays as it is: local **demo** data, not the path a real clinic
+takes.
+
 ## Database
 
 Migrations live in `supabase/migrations/`:
@@ -33,6 +55,14 @@ Migrations live in `supabase/migrations/`:
 - `011_patient_messaging.sql` — patient messaging inbox: `patient_messages` +
   `patient_threads`, their RLS policies, and the `capture_patient_message` RPC
   that stores an inbound message and bumps its thread in one transaction
+- `012_clinic_onboarding.sql` — self-serve clinic creation: `is_clinic_admin()`,
+  `my_membership_status()`, `clinic_member_identities()`, the
+  `create_clinic_with_owner` and `connect_wacrm_account` RPCs, the last-admin and
+  doctor-profile guard triggers, and one active wacrm mapping per clinic
+- `013_clinic_invites.sql` — `clinic_invites` (hash-only tokens) + the
+  `accept_clinic_invite` enrolment transaction
+- `014_admin_write_policies.sql` — member-read / admin-write split over the seven
+  tenant-configuration tables, plus the `set_doctor_services` RPC
 
 Apply them with the Supabase CLI (`supabase db push`) or paste into the SQL
 editor in order.
@@ -91,6 +121,52 @@ instead of double-booking.
 needs already exists: `patients` with its `UNIQUE (clinic_id, wa_phone)`, the
 `patients_access` policy from `003_rls_policies.sql`, and the
 `appointments.created_via` check that already allows `'portal'`.
+
+### Self-serve onboarding
+
+A clinic now onboards itself: `/signup` → `/onboarding` → `/setup`'s checklist,
+with `/staff` for invites and roles and `/services` for prices and the
+doctor-service mapping. Staff arrive through a one-time invite link
+(`/join/<token>`) and set their own password; only the hash of the token is ever
+stored. Run `supabase db push` so `012`, `013` and `014` are applied — without
+them `/onboarding` cannot create a clinic and the admin screens are inert.
+
+What makes a member bookable is a **doctor profile**, not a role, so a solo
+owner stays `admin` and still appears to patients on WhatsApp.
+
+The onboarding tests that need a real database are gated on three vars, so
+`npm test` skips them. To run them against a throwaway stack with the migrations
+applied:
+
+```bash
+supabase start
+supabase db push
+TEST_DATABASE_URL=http://127.0.0.1:54321 \
+TEST_DATABASE_SERVICE_KEY=<local service_role key> \
+TEST_DATABASE_ANON_KEY=<local anon key> \
+npx vitest run src/lib/portal/onboarding.integration.test.ts
+```
+
+The anon key is **required**, not optional: the service-role client bypasses RLS,
+so the tenant-isolation cases would pass vacuously without a real user session.
+
+**Release gate — do not admit real clinics before both of these pass.**
+`npm test` alone never touches a database, so the four RPC transactions, the
+last-admin and doctor-profile guards, and the member-read / admin-write policies
+`014` installs over seven live tables are otherwise only covered by mocks:
+
+1. `012_clinic_onboarding.sql`, `013_clinic_invites.sql` and
+   `014_admin_write_policies.sql` are applied with `supabase db push`.
+2. `src/lib/portal/onboarding.integration.test.ts` passes against a throwaway
+   stack with those migrations applied (the command above), on any machine with
+   Docker.
+
+> **Status: neither condition has been met yet.** The suite ships **unexecuted**
+> — it was written on a machine with no Docker daemon and no `supabase/config.toml`,
+> so no local stack could be started and `012`–`014` have not been applied to any
+> database. Treat the feature as unverified against Postgres until someone runs
+> the two steps above. The board keeps ONB-1's 🚦 launch gate open for the
+> separate compliance reason (COMP-1/COMP-2).
 
 ## Scripts
 
