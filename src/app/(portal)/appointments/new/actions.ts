@@ -134,11 +134,13 @@ export async function createAppointment(
 
     switch (result.status) {
       case 'booked':
-        // The dashboard is cached per day; refresh both the bare route
-        // and the day the appointment landed on so it shows immediately
-        // (R6).
+        // Drop the dashboard's cached render so the new appointment is
+        // there on return (R6). Only the bare path — Next keys the path
+        // cache without search params, so revalidating
+        // '/dashboard?date=…' would target nothing. The specific day
+        // comes back fresh because SlotPicker pushes to it and then
+        // calls router.refresh().
         revalidatePath('/dashboard')
-        revalidatePath(`/dashboard?date=${date}`)
         return { error: null, slotTaken: false, appointmentId: result.appointmentId }
       case 'slot_taken':
         // Someone else won the race between display and submit. Same

@@ -34,6 +34,14 @@ const YMD = /^\d{4}-\d{2}-\d{2}$/
  * the redirect. The href() helper below rebuilds the query from scratch,
  * so the notice drops off the first time staff navigate anywhere else —
  * it is about the add they just did, not about the patient.
+ *
+ * Carrying it in the URL means it can also be WRONG: a forged or shared
+ * link shows the notice for a patient nobody just re-entered. That is
+ * accepted rather than fixed, because the row itself does not record
+ * that a staff member typed an existing number — only the add that
+ * learned it knows, and it is gone by the time this page renders. The
+ * cost is one stale sentence about a name that is correct either way;
+ * the flag never changes which patient is booked.
  */
 export default async function NewAppointmentPage({
   searchParams,

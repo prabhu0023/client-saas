@@ -8,7 +8,7 @@ import type { Validated } from './availability-validate'
  * hit, and they must be unit-testable without Supabase or auth.
  *
  * Two of these exist to protect the QUERY, not just the user:
- *  - normalizeSearchTerm refuses anything under two characters, so the
+ *  - buildSearchTerms refuses anything under two characters, so the
  *    type-ahead can never turn a single keystroke into an unbounded
  *    `ilike '%a%'` scan over the clinic's whole patient table.
  *  - escapeLikePattern neutralises the LIKE metacharacters, so a staff
@@ -41,19 +41,42 @@ export function validateE164(raw: string): Validated<string> {
   return { ok: true, value }
 }
 
+export interface SearchTerms {
+  /** Matched against full_name: the term exactly as typed, trimmed. */
+  name: string
+  /**
+   * Matched against wa_phone: the same term with a leading '+' and the
+   * punctuation people put in phone numbers removed. Null when what is
+   * left is too short to query on.
+   */
+  phone: string | null
+}
+
 /**
- * Reduce a typed search term to what both columns can be matched on:
- * trim, drop the punctuation people put in phone numbers (spaces,
- * dashes, dots, brackets) and a leading '+', so '+91 90000-00001' finds
- * the stored '+919000000001'. Names are unaffected — they don't contain
- * those characters — which is why one normalisation serves both columns.
+ * Split a typed search term into ONE pattern PER COLUMN, because the two
+ * columns need opposite treatment.
+ *
+ * wa_phone is stored compact, so '+91 90000-00001' only finds
+ * '+919000000001' once the '+', spaces and dashes are stripped.
+ * full_name is the opposite: names legitimately contain exactly those
+ * characters, so stripping them makes 'Asha R', 'Jean-Luc' and 'M. Rao'
+ * match nothing at all. A single normalisation cannot serve both — the
+ * term goes to full_name as typed and to wa_phone stripped.
+ *
+ * The two-character floor is applied to the typed term, and again to the
+ * stripped one: '+9' is long enough to type but would leave a one-digit
+ * phone pattern, so the phone read is dropped rather than scanned.
  */
-export function normalizeSearchTerm(raw: string): Validated<string> {
-  const value = raw.trim().replace(/^\+/, '').replace(/[\s\-.()]/g, '')
-  if (value.length < MIN_SEARCH_CHARS) {
+export function buildSearchTerms(raw: string): Validated<SearchTerms> {
+  const name = raw.trim()
+  if (name.length < MIN_SEARCH_CHARS) {
     return { ok: false, error: 'type at least 2 characters' }
   }
-  return { ok: true, value }
+  const digits = name.replace(/^\+/, '').replace(/[\s\-.()]/g, '')
+  return {
+    ok: true,
+    value: { name, phone: digits.length >= MIN_SEARCH_CHARS ? digits : null },
+  }
 }
 
 /**
@@ -63,6 +86,24 @@ export function normalizeSearchTerm(raw: string): Validated<string> {
  */
 export function escapeLikePattern(raw: string): string {
   return raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
+}
+
+/**
+ * True when 'YYYY-MM-DD' is a day that exists. The shape regex alone
+ * lets '1990-02-31' and '2099-13-45' through, and the `date` column
+ * rejects them — which would reach staff as a raw Postgres message
+ * instead of the form's own wording. Round-tripping through a UTC Date
+ * catches it here: Date normalises an overflowing day (Feb 31 → Mar 3),
+ * so a mismatch on any component means the date was never real.
+ */
+function isRealYmd(ymd: string): boolean {
+  const [y, m, d] = ymd.split('-').map(Number)
+  const date = new Date(Date.UTC(y, m - 1, d))
+  return (
+    date.getUTCFullYear() === y &&
+    date.getUTCMonth() === m - 1 &&
+    date.getUTCDate() === d
+  )
 }
 
 export interface ValidatedNewPatient {
@@ -93,7 +134,7 @@ export function validateNewPatient(input: {
   const dobRaw = (input.dateOfBirth ?? '').trim()
   let dateOfBirth: string | null = null
   if (dobRaw) {
-    if (!YMD.test(dobRaw)) {
+    if (!YMD.test(dobRaw) || !isRealYmd(dobRaw)) {
       return { ok: false, error: 'invalid date of birth (use YYYY-MM-DD)' }
     }
     dateOfBirth = dobRaw

@@ -182,6 +182,22 @@ beforeEach(() => {
         notes: null,
       },
       {
+        id: 'pat-a4',
+        clinic_id: CLINIC_A,
+        full_name: 'Jean-Luc P',
+        wa_phone: '+919000000004',
+        date_of_birth: null,
+        notes: null,
+      },
+      {
+        id: 'pat-a5',
+        clinic_id: CLINIC_A,
+        full_name: 'M. Rao',
+        wa_phone: '+918888800005',
+        date_of_birth: null,
+        notes: null,
+      },
+      {
         id: 'pat-b1',
         clinic_id: CLINIC_B,
         full_name: 'Asha Other',
@@ -203,6 +219,21 @@ describe('searchPatients', () => {
       waPhone: '+919000000001',
       dateOfBirth: '1990-03-10',
     })
+  })
+
+  it('matches a name typed with a space — the normal way to search (R1)', async () => {
+    const found = await searchPatients(CLINIC_A, 'Asha R')
+    expect(found.map((p) => p.id)).toEqual(['pat-a1'])
+  })
+
+  it('matches a hyphenated name (R1)', async () => {
+    const found = await searchPatients(CLINIC_A, 'Jean-Luc')
+    expect(found.map((p) => p.id)).toEqual(['pat-a4'])
+  })
+
+  it('matches a name written with an initial and a dot (R1)', async () => {
+    const found = await searchPatients(CLINIC_A, 'M. Rao')
+    expect(found.map((p) => p.id)).toEqual(['pat-a5'])
   })
 
   it('matches a phone fragment (R1)', async () => {
@@ -245,9 +276,15 @@ describe('searchPatients', () => {
   })
 
   it('respects the limit', async () => {
-    // '91900' matches all three clinic-A patients on phone.
-    expect(await searchPatients(CLINIC_A, '91900')).toHaveLength(3)
+    // '91900' matches four clinic-A patients on phone.
+    expect(await searchPatients(CLINIC_A, '91900')).toHaveLength(4)
     expect(await searchPatients(CLINIC_A, '91900', 2)).toHaveLength(2)
+  })
+
+  it('issues no phone query when stripping leaves too little to match on', async () => {
+    expect(await searchPatients(CLINIC_A, '+9')).toEqual([])
+    // Only the name read ran — '%+9%' matches no stored name.
+    expect(queries).toEqual([{ table: 'patients', op: 'select' }])
   })
 })
 
@@ -312,7 +349,8 @@ describe('createOrReusePatient', () => {
     expect(stored.full_name).toBe('Asha R')
     expect(stored.date_of_birth).toBe('1990-03-10')
     expect(stored.notes).toBe('regular')
-    expect(db.patients.filter((p) => p.clinic_id === CLINIC_A)).toHaveLength(3)
+    // No sixth row: the duplicate reused the seeded five.
+    expect(db.patients.filter((p) => p.clinic_id === CLINIC_A)).toHaveLength(5)
   })
 
   it('still creates the patient when another clinic holds the same number', async () => {

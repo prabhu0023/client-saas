@@ -13,6 +13,11 @@ import type { Slot } from '@/types'
  * The RLS cookie client is a tiny in-memory fake with no RLS, so the
  * cross-clinic case proves this module's own clinic_id scoping, not the
  * database's.
+ *
+ * The embedded `clinic_members!inner(status)` filter is modelled by
+ * seeding the dotted column name flat on the row, because the fake
+ * matches `.eq()` keys literally. It stands in for an inner join, so it
+ * proves the filter is PASSED, not that PostgREST joins the way we think.
  */
 
 type Row = Record<string, unknown>
@@ -78,8 +83,24 @@ beforeEach(() => {
   generateSlotsMock.mockResolvedValue(SLOTS)
   db = {
     doctor_profiles: [
-      { id: 'doc-a1', clinic_id: CLINIC_A, slot_duration_minutes: 20 },
-      { id: 'doc-b1', clinic_id: CLINIC_B, slot_duration_minutes: 30 },
+      {
+        id: 'doc-a1',
+        clinic_id: CLINIC_A,
+        slot_duration_minutes: 20,
+        'clinic_members.status': 'active',
+      },
+      {
+        id: 'doc-a2',
+        clinic_id: CLINIC_A,
+        slot_duration_minutes: 20,
+        'clinic_members.status': 'inactive',
+      },
+      {
+        id: 'doc-b1',
+        clinic_id: CLINIC_B,
+        slot_duration_minutes: 30,
+        'clinic_members.status': 'active',
+      },
     ],
   }
 })
@@ -95,6 +116,12 @@ describe('getDoctorSlotMinutes', () => {
 
   it('returns null for an unknown doctor', async () => {
     expect(await getDoctorSlotMinutes(CLINIC_A, 'doc-nope')).toBeNull()
+  })
+
+  it('returns null for a doctor whose clinic membership is not active', async () => {
+    // listClinicDoctors never offers them, so this gate must not admit
+    // them either.
+    expect(await getDoctorSlotMinutes(CLINIC_A, 'doc-a2')).toBeNull()
   })
 })
 
@@ -146,6 +173,18 @@ describe('listSlotsForDay', () => {
     const slots = await listSlotsForDay({
       clinicId: CLINIC_A,
       doctorId: 'doc-nope',
+      dateYmd: '2099-03-10',
+      timezone: 'Asia/Kolkata',
+      now: NOW,
+    })
+    expect(slots).toEqual([])
+    expect(generateSlotsMock).not.toHaveBeenCalled()
+  })
+
+  it('returns [] for a deactivated doctor of this clinic without generating slots', async () => {
+    const slots = await listSlotsForDay({
+      clinicId: CLINIC_A,
+      doctorId: 'doc-a2',
       dateYmd: '2099-03-10',
       timezone: 'Asia/Kolkata',
       now: NOW,

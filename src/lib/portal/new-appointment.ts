@@ -22,9 +22,19 @@ import type { PatientRef } from './patients'
  * clinic_id, and a doctor id that isn't in the caller's clinic comes
  * back null, which short-circuits to no slots. That doubles as the gate
  * on a forged `?doctor=` value.
+ *
+ * It filters on an ACTIVE clinic_members row too, so this gate admits
+ * exactly who the picker offers — listClinicDoctors in
+ * src/lib/portal/availability.ts joins the same way. Without it a
+ * doctor whose membership was deactivated would still be bookable by
+ * posting their id, which is a disagreement between the two halves of
+ * the same screen rather than a cross-clinic leak.
  */
 
-/** Doctor's configured slot length, or null if not in this clinic. */
+/**
+ * Doctor's configured slot length, or null when they are not an active
+ * doctor of this clinic.
+ */
 export async function getDoctorSlotMinutes(
   clinicId: string,
   doctorId: string,
@@ -32,9 +42,10 @@ export async function getDoctorSlotMinutes(
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('doctor_profiles')
-    .select('slot_duration_minutes')
+    .select('slot_duration_minutes, clinic_members!inner(status)')
     .eq('id', doctorId)
     .eq('clinic_id', clinicId)
+    .eq('clinic_members.status', 'active')
     .maybeSingle()
 
   if (error) throw new Error(`doctor slot length fetch: ${error.message}`)
@@ -46,7 +57,8 @@ export async function getDoctorSlotMinutes(
 
 /**
  * The open slots for one doctor on one clinic-local day. Empty when the
- * doctor isn't this clinic's (R5) or has no slot length configured.
+ * doctor isn't an active doctor of this clinic (R5) or has no slot
+ * length configured.
  */
 export async function listSlotsForDay(args: {
   clinicId: string

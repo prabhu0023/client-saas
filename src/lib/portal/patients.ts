@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import {
+  buildSearchTerms,
   escapeLikePattern,
-  normalizeSearchTerm,
   type ValidatedNewPatient,
 } from './patient-validate'
 
@@ -22,7 +22,14 @@ import {
  * either break the query or inject extra filter conditions into it;
  * `.ilike()` sends the value as a parameterised filter, which a typed
  * name can never escape. Two round trips, issued in parallel, is the
- * price of that.
+ * price of that — and it is also what lets each column be matched on
+ * its own pattern (see buildSearchTerms).
+ *
+ * Because the two reads are capped independently and merged afterwards,
+ * the returned list is INDICATIVE rather than the overall top-N: a
+ * clinic with many similar names can have a match fall outside it. That
+ * is acceptable for a type-ahead — the answer is to type more — so each
+ * read takes a wider slice than the caller asked for to make it rare.
  */
 
 export interface PatientRef {
@@ -52,33 +59,43 @@ function toRef(row: PatientRow): PatientRef {
 
 /**
  * Patients in the clinic whose name OR phone contains the typed term,
- * case-insensitively (R1). Returns [] for a term the type-ahead must not
- * query on (blank, one character) so no keystroke becomes a table scan.
+ * case-insensitively (R1). The name is matched on the term as typed and
+ * the phone on its digits, so 'Asha R' and '+91 90000-00001' both find
+ * their patient. Returns [] for a term the type-ahead must not query on
+ * (blank, one character) so no keystroke becomes a table scan.
  */
 export async function searchPatients(
   clinicId: string,
   rawTerm: string,
   limit = 10,
 ): Promise<PatientRef[]> {
-  const term = normalizeSearchTerm(rawTerm)
-  if (!term.ok) return []
+  const terms = buildSearchTerms(rawTerm)
+  if (!terms.ok) return []
 
-  const pattern = `%${escapeLikePattern(term.value)}%`
+  const namePattern = `%${escapeLikePattern(terms.value.name)}%`
+  const phonePattern = terms.value.phone
+    ? `%${escapeLikePattern(terms.value.phone)}%`
+    : null
   const supabase = await createClient()
+  // Each read takes a wider slice than `limit` so the post-merge sort
+  // has something to choose from (see the module comment).
+  const perRead = limit * 2
 
   const [byName, byPhone] = await Promise.all([
     supabase
       .from('patients')
       .select(COLUMNS)
       .eq('clinic_id', clinicId)
-      .ilike('full_name', pattern)
-      .limit(limit),
-    supabase
-      .from('patients')
-      .select(COLUMNS)
-      .eq('clinic_id', clinicId)
-      .ilike('wa_phone', pattern)
-      .limit(limit),
+      .ilike('full_name', namePattern)
+      .limit(perRead),
+    phonePattern
+      ? supabase
+          .from('patients')
+          .select(COLUMNS)
+          .eq('clinic_id', clinicId)
+          .ilike('wa_phone', phonePattern)
+          .limit(perRead)
+      : { data: [] as PatientRow[], error: null },
   ])
 
   if (byName.error) throw new Error(`patient search failed: ${byName.error.message}`)

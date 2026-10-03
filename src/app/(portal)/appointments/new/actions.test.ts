@@ -230,9 +230,28 @@ beforeEach(() => {
         notes: null,
       },
     ],
+    // 'clinic_members.status' is seeded flat because the fake matches
+    // .eq() keys literally; it stands in for the inner join that
+    // getDoctorSlotMinutes and listClinicDoctors both apply.
     doctor_profiles: [
-      { id: 'doc-a1', clinic_id: CLINIC_A, slot_duration_minutes: 20 },
-      { id: 'doc-b1', clinic_id: CLINIC_B, slot_duration_minutes: 30 },
+      {
+        id: 'doc-a1',
+        clinic_id: CLINIC_A,
+        slot_duration_minutes: 20,
+        'clinic_members.status': 'active',
+      },
+      {
+        id: 'doc-a2',
+        clinic_id: CLINIC_A,
+        slot_duration_minutes: 20,
+        'clinic_members.status': 'inactive',
+      },
+      {
+        id: 'doc-b1',
+        clinic_id: CLINIC_B,
+        slot_duration_minutes: 30,
+        'clinic_members.status': 'active',
+      },
     ],
   }
 })
@@ -259,10 +278,11 @@ describe('createAppointment — happy path', () => {
     })
   })
 
-  it('revalidates the dashboard and the booked day (R6)', async () => {
+  it('revalidates the dashboard path, and only that (R6)', async () => {
     await createAppointment(createForm())
-    expect(revalidatePathMock).toHaveBeenCalledWith('/dashboard')
-    expect(revalidatePathMock).toHaveBeenCalledWith(`/dashboard?date=${DATE}`)
+    // Search params are not part of the path cache key, so a
+    // '/dashboard?date=…' call would revalidate nothing.
+    expect(revalidatePathMock.mock.calls).toEqual([['/dashboard']])
   })
 })
 
@@ -311,6 +331,16 @@ describe('createAppointment — tenancy', () => {
     expect(state.appointmentId).toBeNull()
     // No slot length is readable for that doctor, so no slots are even
     // generated — the forged id can't reach the write path.
+    expect(generateSlotsMock).not.toHaveBeenCalled()
+    expect(bookAppointmentMock).not.toHaveBeenCalled()
+  })
+
+  it('refuses a doctor whose clinic membership is not active, without booking', async () => {
+    const state = await createAppointment(createForm({ doctorId: 'doc-a2' }))
+
+    expect(state.error).not.toBeNull()
+    expect(state.appointmentId).toBeNull()
+    // The picker never offers them, so the submit gate must agree.
     expect(generateSlotsMock).not.toHaveBeenCalled()
     expect(bookAppointmentMock).not.toHaveBeenCalled()
   })

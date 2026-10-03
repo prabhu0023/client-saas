@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   validateE164,
-  normalizeSearchTerm,
+  buildSearchTerms,
   escapeLikePattern,
   validateNewPatient,
 } from './patient-validate'
@@ -41,28 +41,55 @@ describe('validateE164', () => {
   })
 })
 
-describe('normalizeSearchTerm', () => {
-  it('strips phone punctuation and a leading +', () => {
-    expect(normalizeSearchTerm('+91 90000-00001')).toEqual({
+describe('buildSearchTerms', () => {
+  it('strips phone punctuation and a leading + for the phone column only', () => {
+    expect(buildSearchTerms('+91 90000-00001')).toEqual({
       ok: true,
-      value: '919000000001',
+      value: { name: '+91 90000-00001', phone: '919000000001' },
     })
   })
 
-  it('leaves a name fragment alone', () => {
-    expect(normalizeSearchTerm('  Asha  ')).toEqual({ ok: true, value: 'Asha' })
+  it('keeps a two-word name as typed, so the name column can match it', () => {
+    expect(buildSearchTerms('  Asha R  ')).toEqual({
+      ok: true,
+      value: { name: 'Asha R', phone: 'AshaR' },
+    })
+  })
+
+  it('keeps a hyphenated name as typed', () => {
+    expect(buildSearchTerms('Jean-Luc')).toEqual({
+      ok: true,
+      value: { name: 'Jean-Luc', phone: 'JeanLuc' },
+    })
+  })
+
+  it('keeps an initial-and-dot name as typed', () => {
+    expect(buildSearchTerms('M. Rao')).toEqual({
+      ok: true,
+      value: { name: 'M. Rao', phone: 'MRao' },
+    })
   })
 
   it('rejects an empty term', () => {
-    expect(normalizeSearchTerm('').ok).toBe(false)
+    expect(buildSearchTerms('').ok).toBe(false)
   })
 
   it('rejects a single character — no unbounded scan on one keystroke', () => {
-    expect(normalizeSearchTerm('a').ok).toBe(false)
+    expect(buildSearchTerms('a').ok).toBe(false)
   })
 
   it('accepts two characters', () => {
-    expect(normalizeSearchTerm('as')).toEqual({ ok: true, value: 'as' })
+    expect(buildSearchTerms('as')).toEqual({
+      ok: true,
+      value: { name: 'as', phone: 'as' },
+    })
+  })
+
+  it('drops the phone pattern when stripping leaves under two characters', () => {
+    expect(buildSearchTerms('+9')).toEqual({
+      ok: true,
+      value: { name: '+9', phone: null },
+    })
   })
 })
 
@@ -134,6 +161,27 @@ describe('validateNewPatient', () => {
       dateOfBirth: '10-03-1990',
     })
     expect(result.ok).toBe(false)
+  })
+
+  it('rejects a well-formed but impossible DOB before it reaches the insert', () => {
+    for (const dateOfBirth of ['1990-02-31', '2099-13-45', '1990-00-10', '1990-04-00']) {
+      expect(
+        validateNewPatient({
+          fullName: 'Asha R',
+          waPhone: '+919876543210',
+          dateOfBirth,
+        }),
+      ).toEqual({ ok: false, error: 'invalid date of birth (use YYYY-MM-DD)' })
+    }
+  })
+
+  it('accepts a real leap day', () => {
+    const result = validateNewPatient({
+      fullName: 'Asha R',
+      waPhone: '+919876543210',
+      dateOfBirth: '1988-02-29',
+    })
+    expect(result.ok).toBe(true)
   })
 
   it('keeps a valid DOB and trimmed notes', () => {
