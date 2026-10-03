@@ -15,6 +15,14 @@ type Row = Record<string, unknown>
 
 let db: Record<string, Row[]>
 
+/**
+ * Fires once, just before an insert lands, so a test can model another
+ * request winning the race for UNIQUE (clinic_id, patient_id).
+ */
+let onInsert: (() => void) | null = null
+
+let threadSeq = 0
+
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({ from: (table: string) => makeBuilder(table) }),
 }))
@@ -36,6 +44,8 @@ function makeBuilder(table: string) {
   const orders: Array<{ col: string; asc: boolean }> = []
   let cols = '*'
   let max: number | null = null
+  let inserted: Row[] | null = null
+  let insertError: { code?: string; message: string } | null = null
 
   const shape = (r: Row): Row => {
     const out: Row = { ...r }
@@ -85,13 +95,65 @@ function makeBuilder(table: string) {
       max = n
       return chain
     },
-    maybeSingle: async () => ({ data: run()[0] ?? null, error: null }),
+    /**
+     * Appends rows, enforcing only the one constraint this module relies
+     * on: UNIQUE (clinic_id, patient_id) on patient_threads, reported as
+     * Postgres error 23505 the way supabase-js surfaces it.
+     */
+    insert: (values: Row | Row[]) => {
+      const rows = Array.isArray(values) ? values : [values]
+
+      if (onInsert) {
+        const hook = onInsert
+        onInsert = null
+        hook()
+      }
+
+      const clash =
+        table === 'patient_threads' &&
+        rows.some((r) =>
+          (db.patient_threads ?? []).some(
+            (e) =>
+              e.clinic_id === r.clinic_id && e.patient_id === r.patient_id,
+          ),
+        )
+
+      if (clash) {
+        insertError = {
+          code: '23505',
+          message:
+            'duplicate key value violates unique constraint "patient_threads_clinic_id_patient_id_key"',
+        }
+        return chain
+      }
+
+      const created = rows.map((r) => ({
+        id: `thr-new-${++threadSeq}`,
+        unread_count: 0,
+        last_message_at: null,
+        ...r,
+      }))
+      db[table] = [...(db[table] ?? []), ...created]
+      inserted = created
+      return chain
+    },
+    maybeSingle: async () => {
+      if (insertError) return { data: null, error: insertError }
+      if (inserted) return { data: inserted[0] ?? null, error: null }
+      return { data: run()[0] ?? null, error: null }
+    },
     then: (
-      resolve: (v: { data: Row[]; error: null }) => unknown,
+      resolve: (v: {
+        data: Row[] | null
+        error: { code?: string; message: string } | null
+      }) => unknown,
       reject?: (e: unknown) => unknown,
     ) => {
       try {
-        return Promise.resolve({ data: run(), error: null }).then(resolve)
+        const value = insertError
+          ? { data: null, error: insertError }
+          : { data: inserted ?? run(), error: null }
+        return Promise.resolve(value).then(resolve)
       } catch (e) {
         return reject ? reject(e) : Promise.reject(e)
       }
@@ -105,6 +167,7 @@ import {
   getThread,
   getThreadTimeline,
   isWindowOpen,
+  openThreadForPatient,
 } from './messages'
 
 const CLINIC_A = 'clinic-a'
@@ -116,6 +179,8 @@ function hoursAgo(h: number): string {
 }
 
 beforeEach(() => {
+  onInsert = null
+  threadSeq = 0
   db = {
     patients: [
       { id: 'pat-a1', clinic_id: CLINIC_A, full_name: 'Asha R', wa_phone: '+919000000001' },
@@ -306,6 +371,72 @@ describe('getThread', () => {
 
   it('returns null for an unknown id', async () => {
     expect(await getThread(CLINIC_A, 'nope')).toBeNull()
+  })
+})
+
+describe('openThreadForPatient', () => {
+  it("reuses the patient's existing thread instead of making a second one", async () => {
+    const before = db.patient_threads.length
+    expect(await openThreadForPatient(CLINIC_A, 'pat-a1')).toBe('thr-a1')
+    expect(db.patient_threads.length).toBe(before)
+  })
+
+  it('creates an empty open thread for a patient who never messaged', async () => {
+    db.patients.push({
+      id: 'pat-a3',
+      clinic_id: CLINIC_A,
+      full_name: 'Just Booked',
+      wa_phone: '+919000000004',
+    })
+
+    const threadId = await openThreadForPatient(CLINIC_A, 'pat-a3')
+    expect(threadId).not.toBeNull()
+
+    const created = db.patient_threads.find((t) => t.id === threadId)!
+    expect(created.clinic_id).toBe(CLINIC_A)
+    expect(created.patient_id).toBe('pat-a3')
+    expect(created.status).toBe('open')
+    // Opening a chat is not a message: nothing unread, no activity.
+    expect(created.unread_count).toBe(0)
+    expect(created.last_message_at).toBeNull()
+  })
+
+  it("returns null for another clinic's patient and writes nothing (R8)", async () => {
+    const before = db.patient_threads.length
+    expect(await openThreadForPatient(CLINIC_A, 'pat-b1')).toBeNull()
+    expect(db.patient_threads.length).toBe(before)
+  })
+
+  it('returns null for an unknown patient id', async () => {
+    expect(await openThreadForPatient(CLINIC_A, 'nope')).toBeNull()
+  })
+
+  it("adopts the winner's thread when another request creates it first", async () => {
+    db.patients.push({
+      id: 'pat-a4',
+      clinic_id: CLINIC_A,
+      full_name: 'Raced',
+      wa_phone: '+919000000005',
+    })
+
+    // Another request inserts the row after our lookup missed but
+    // before our insert lands — the real UNIQUE constraint's job.
+    onInsert = () => {
+      db.patient_threads.push({
+        id: 'thr-winner',
+        clinic_id: CLINIC_A,
+        patient_id: 'pat-a4',
+        status: 'open',
+        escalated_to_doctor_id: null,
+        unread_count: 0,
+        last_message_at: null,
+      })
+    }
+
+    expect(await openThreadForPatient(CLINIC_A, 'pat-a4')).toBe('thr-winner')
+    expect(
+      db.patient_threads.filter((t) => t.patient_id === 'pat-a4').length,
+    ).toBe(1)
   })
 })
 

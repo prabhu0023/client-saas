@@ -23,6 +23,12 @@ import type {
  * client that bypasses RLS. So every read in this feature — including
  * the single answer to the 24h-window question (isWindowOpen below) —
  * lives here, with no second copy of the rule to drift from.
+ *
+ * One exception to "reads only": openThreadForPatient writes, because
+ * opening a patient's chat from their appointment has to work before
+ * they have ever messaged, and that means the thread row may not exist
+ * yet. It is kept here rather than in the 'use server' actions module
+ * so it is NOT reachable as a server action — only a page can call it.
  */
 
 /** Free-form WhatsApp replies are only allowed inside this window. */
@@ -266,6 +272,80 @@ export async function getThread(
     patientName: row.patients?.full_name ?? null,
     patientPhone: row.patients?.wa_phone ?? '',
   }
+}
+
+/**
+ * The thread id for one patient, creating the thread when they have
+ * never messaged — so staff can open a chat straight from a visit on the
+ * dashboard instead of waiting for the patient to write first.
+ *
+ * Returns null when the patient isn't in this clinic, which the caller
+ * turns into a 404 (same no-leak contract as getThread).
+ *
+ * A thread opened this way starts empty: status 'open', unread_count 0,
+ * last_message_at null. It is NOT a message and nothing is sent — it
+ * only gives the conversation somewhere to live. The UNIQUE
+ * (clinic_id, patient_id) constraint from migration 011 is what makes
+ * this safe against two staff opening the same patient at once: the
+ * loser of the race re-reads the winner's row instead of erroring.
+ */
+export async function openThreadForPatient(
+  clinicId: string,
+  patientId: string,
+): Promise<string | null> {
+  const supabase = await createClient()
+
+  // Confirm the patient is this clinic's before writing anything.
+  const { data: patient, error: patientErr } = await supabase
+    .from('patients')
+    .select('id')
+    .eq('id', patientId)
+    .eq('clinic_id', clinicId)
+    .maybeSingle()
+
+  if (patientErr) throw new Error(`patient fetch: ${patientErr.message}`)
+  if (!patient) return null
+
+  const existing = await findThreadId(supabase, clinicId, patientId)
+  if (existing) return existing
+
+  const { data: created, error: insertErr } = await supabase
+    .from('patient_threads')
+    .insert({ clinic_id: clinicId, patient_id: patientId, status: 'open' })
+    .select('id')
+    .maybeSingle()
+
+  if (!insertErr) {
+    const id = (created as { id: string } | null)?.id
+    if (id) return id
+    // Insert reported success but returned nothing (RLS can hide the
+    // RETURNING row); fall through and read it back.
+    return findThreadId(supabase, clinicId, patientId)
+  }
+
+  // 23505 = unique violation: someone else opened it first. Re-read.
+  if (insertErr.code === '23505') {
+    return findThreadId(supabase, clinicId, patientId)
+  }
+
+  throw new Error(`thread open failed: ${insertErr.message}`)
+}
+
+/** The existing thread id for (clinic, patient), or null. */
+async function findThreadId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  clinicId: string,
+  patientId: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('patient_threads')
+    .select('id')
+    .eq('clinic_id', clinicId)
+    .eq('patient_id', patientId)
+    .maybeSingle()
+
+  if (error) throw new Error(`thread lookup failed: ${error.message}`)
+  return (data as { id: string } | null)?.id ?? null
 }
 
 /**

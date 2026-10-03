@@ -17,6 +17,8 @@ export interface DashboardAppointment {
   createdVia: 'whatsapp' | 'portal'
   startLabel: string
   endLabel: string
+  /** The patient this visit belongs to — the key the inbox opens on. */
+  patientId: string
   patientName: string | null
   patientPhone: string
   serviceName: string | null
@@ -31,6 +33,7 @@ interface AppointmentJoinRow {
   status: AppointmentStatus
   created_via: 'whatsapp' | 'portal'
   doctor_id: string
+  patient_id: string
   patients: { full_name: string | null; wa_phone: string } | null
   services: { name: string } | null
   doctor_profiles: { specialty: string | null } | null
@@ -68,7 +71,7 @@ export async function getAppointmentsForDay(args: {
   const { data, error } = await supabase
     .from('appointments')
     .select(
-      `id, starts_at, ends_at, status, created_via, doctor_id,
+      `id, starts_at, ends_at, status, created_via, doctor_id, patient_id,
        patients ( full_name, wa_phone ),
        services ( name ),
        doctor_profiles ( specialty )`,
@@ -90,6 +93,7 @@ export async function getAppointmentsForDay(args: {
     createdVia: r.created_via,
     startLabel: localTimeLabel(new Date(r.starts_at), timezone),
     endLabel: localTimeLabel(new Date(r.ends_at), timezone),
+    patientId: r.patient_id,
     patientName: r.patients?.full_name ?? null,
     patientPhone: r.patients?.wa_phone ?? '',
     serviceName: r.services?.name ?? null,

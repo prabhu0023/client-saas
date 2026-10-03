@@ -173,6 +173,7 @@ function toBoardCards(
     status: a.status,
     startLabel: a.startLabel,
     endLabel: a.endLabel,
+    patientId: a.patientId,
     patientName: a.patientName,
     patientPhone: a.patientPhone,
     serviceName: a.serviceName,
@@ -235,6 +236,12 @@ function AgendaRow({
       </span>
 
       <div className={styles.actions}>
+        <Link
+          className={styles.messageLink}
+          href={`/inbox/patient/${appt.patientId}`}
+        >
+          Message
+        </Link>
         {actions.map((next) => (
           <form key={next} action={updateAppointmentStatus}>
             <input type="hidden" name="id" value={appt.id} />

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import type { AppointmentStatus } from '@/types'
 import { updateAppointmentStatus } from './actions'
 import styles from './dashboard.module.css'
@@ -22,6 +23,7 @@ export interface BoardCard {
   status: AppointmentStatus
   startLabel: string
   endLabel: string
+  patientId: string
   patientName: string | null
   patientPhone: string
   serviceName: string | null
@@ -193,6 +195,22 @@ function Card({
         {card.serviceName ?? 'No service'}
         {card.doctorLabel ? ` · ${card.doctorLabel}` : ''}
         {` · via ${card.createdVia}`}
+      </div>
+      <div className={styles.cardActions}>
+        {/*
+          An explicit affordance rather than making the whole card a
+          link: the card is a drag handle for status changes, and a card
+          that both navigates on click and moves on drag misfires
+          constantly. draggable={false} keeps the browser's native
+          link-drag from hijacking the card's dragstart.
+        */}
+        <Link
+          className={styles.messageLink}
+          href={`/inbox/patient/${card.patientId}`}
+          draggable={false}
+        >
+          Message
+        </Link>
       </div>
     </div>
   )
